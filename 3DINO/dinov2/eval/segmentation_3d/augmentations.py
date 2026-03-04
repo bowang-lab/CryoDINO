@@ -643,7 +643,7 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
                 load_transforms + [
                     RandCropByPosNegLabeld(
                         keys=["image", "label"], label_key="label",
-                        spatial_size=crop_size, pos=3, neg=1,
+                        spatial_size=crop_size, pos=5, neg=1,
                         num_samples=N_crops, image_key="image", image_threshold=-1,
                     ),
                     ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
