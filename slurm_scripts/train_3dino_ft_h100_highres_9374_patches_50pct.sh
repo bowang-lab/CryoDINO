@@ -47,6 +47,26 @@ NUM_WORKERS=7
 LEARNING_RATE=1e-4
 CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0
+OVERLAP=0.75
+
+# Inference parameters — keyed by base dataset name (no percent suffix)
+declare -A DATALIST
+DATALIST["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist.json"
+DATALIST["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist.json"
+DATALIST["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
+DATALIST["Dataset049_EMPIAR_12049_transposed_patches512"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist.json"
+
+declare -A NUM_CLASSES
+NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
+NUM_CLASSES["Dataset010_CZII_10010_patches512"]=2
+NUM_CLASSES["Dataset989_EMPIAR_10989_transposed_patches512"]=2
+NUM_CLASSES["Dataset049_EMPIAR_12049_transposed_patches512"]=6
+
+declare -A INFER_DATASET_NAME
+INFER_DATASET_NAME["Dataset001_CZII_10001_patches512"]="Dataset001_CZII_10001"
+INFER_DATASET_NAME["Dataset010_CZII_10010_patches512"]="Dataset010_CZII_10010"
+INFER_DATASET_NAME["Dataset989_EMPIAR_10989_transposed_patches512"]="Dataset989_EMPIAR_10989_transposed"
+INFER_DATASET_NAME["Dataset049_EMPIAR_12049_transposed_patches512"]="Dataset049_EMPIAR_6class"
 
 mkdir -p "$BASE_OUTPUT_DIR"
 
@@ -102,7 +122,44 @@ for i in "${!DATASETS[@]}"; do
       --cache-dir "$CACHE_DIR" \
       --resize-scale "$RESIZE_SCALE"
 
-    echo "Finished: $OUTPUT_DIR"
+    echo "Finished training: $OUTPUT_DIR"
+
+    # =========================
+    # Inference on test set immediately after training
+    # =========================
+    CHECKPOINT="${OUTPUT_DIR}/best_model.pth"
+    INFER_OUTPUT_DIR="${OUTPUT_DIR}/inference"
+    mkdir -p "$INFER_OUTPUT_DIR"
+
+    if [ ! -f "$CHECKPOINT" ]; then
+        echo "  [SKIP inference] checkpoint not found: $CHECKPOINT"
+    else
+        echo "----------------------------------------------"
+        echo "Running inference for: $DATASET_NAME"
+        echo "Checkpoint: $CHECKPOINT"
+        echo "Output:     $INFER_OUTPUT_DIR"
+        echo "----------------------------------------------"
+
+        cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
+
+        OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python inference/segmentation3d_inference.py \
+          --config-file "3DINO/${CONFIG_FILE}" \
+          --pretrained-weights "$PRETRAINED_WEIGHTS" \
+          --checkpoint "$CHECKPOINT" \
+          --segmentation-head "$SEGMENTATION_HEAD" \
+          --image-size "$IMAGE_SIZE" \
+          --num-classes "${NUM_CLASSES[$CACHE_DATASET]}" \
+          --datalist "${DATALIST[$CACHE_DATASET]}" \
+          --output-dir "$INFER_OUTPUT_DIR" \
+          --dataset-name "${INFER_DATASET_NAME[$CACHE_DATASET]}" \
+          --overlap "$OVERLAP" \
+          --batch-size "$BATCH_SIZE" \
+          --cpu-metrics
+
+        echo "Finished inference: $INFER_OUTPUT_DIR"
+
+        cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+    fi
 
 done
 
