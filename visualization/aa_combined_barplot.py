@@ -1,9 +1,9 @@
 """
 Combined bar plot for DS-10001, DS-10010, EMPIAR-10989 at 100% training data.
-Compares CryoDINO (frozen pre-trained) vs nnU-Net (fully supervised).
+Compares CryoDINO (frozen pre-trained) vs nnU-Net (fully supervised) vs Random Init.
 
 Usage:
-    python aa_combined_barplot.py -o ./results -n combined_barplot
+    python aa_combined_barplot.py -o ./results -n combined_barplot_with_random_init
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -37,6 +37,17 @@ DATASETS = {
             "Organelles": np.array([6.708203793, 49.25063324]),
             "Membrane":   np.array([6.0,         88.01704407]),
         },
+        # Random init (ViTAdapterUNETR, fully supervised, no pretraining) — log j1_5872616
+        "rand_dice": {
+            "Cytoplasm":  np.array([0.9526899456977844, 0.9213135838508606]),
+            "Organelles": np.array([0.9053843021392822, 0.7346742749214172]),
+            "Membrane":   np.array([0.8261680603027344, 0.5938450098037720]),
+        },
+        "rand_hd95": {
+            "Cytoplasm":  np.array([33.6749153137207,   114.63856506347656]),
+            "Organelles": np.array([19.595918655395508, 147.2480926513672]),
+            "Membrane":   np.array([9.165151596069336,   82.75868225097656]),
+        },
     },
     "DS-10010": {
         "classes": ["Membrane"],
@@ -56,13 +67,23 @@ DATASETS = {
                                              0.478048325, 0.702472389])},
         "nn_hd95":   {"Membrane": np.array([179.0977325, 111.950882,  360.1749573,
                                              555.4918213, 141.3187866])},
+        # Random init — log j1_5872616 (TE14, UF4, UE4, UF6, TE13)
+        "rand_dice": {"Membrane": np.array([0.4738955795764923, 0.4473776817321777,
+                                             0.7381826639175415, 0.6912893056869507,
+                                             0.6736786365509033])},
+        "rand_hd95": {"Membrane": np.array([184.19012451171875, 552.9828491210938,
+                                             358.33642578125,    152.728515625,
+                                             127.88275909423828])},
     },
     "EMPIAR-10989": {
         "classes": ["Actin Filaments"],
-        "cryo_dice": {"Actin Filaments": np.array([0.3071155548095703])},
+        "cryo_dice": {"Actin Filaments": np.array([0.3171155548095703])},
         "cryo_hd95": {"Actin Filaments": np.array([26.795522689819336])},
         "nn_dice":   {"Actin Filaments": np.array([0.024651486])},
         "nn_hd95":   {"Actin Filaments": np.array([133.8394623])},
+        # Random init — log j2_5872701 (00011)
+        "rand_dice": {"Actin Filaments": np.array([0.31524153661727905])},
+        "rand_hd95": {"Actin Filaments": np.array([35.0])},
     },
 }
 
@@ -84,83 +105,93 @@ def set_paper_style():
     })
 
 
-def plot_dataset_row(axs_row, ds_name, ds_data, color_cryo, color_nn):
-    classes    = ds_data["classes"]
-    cryo_dice  = ds_data["cryo_dice"]
-    cryo_hd95  = ds_data["cryo_hd95"]
-    nn_dice    = ds_data["nn_dice"]
-    nn_hd95    = ds_data["nn_hd95"]
+def plot_dataset_col(ax, ds_data, metric_key, classes, color_cryo, color_nn, color_rand):
+    """Plot one dataset × one metric into a single axis.
+    Bar order: Random Init | nnU-Net | CryoDINO
+    """
+    d_rand = ds_data[f"rand_{metric_key}"]
+    d_nn   = ds_data[f"nn_{metric_key}"]
+    d_cryo = ds_data[f"cryo_{metric_key}"]
 
     x = np.arange(len(classes))
-    w = 0.35
+    w = 0.25
 
-    for ax, d_cryo, d_nn, metric in zip(
-            axs_row,
-            [cryo_dice, cryo_hd95],
-            [nn_dice,   nn_hd95],
-            ["Dice Coefficient", "HD95"]):
+    means_r = [np.mean(d_rand[c]) for c in classes]
+    stds_r  = [np.std(d_rand[c])  for c in classes]
+    means_n = [np.mean(d_nn[c])   for c in classes]
+    stds_n  = [np.std(d_nn[c])    for c in classes]
+    means_c = [np.mean(d_cryo[c]) for c in classes]
+    stds_c  = [np.std(d_cryo[c])  for c in classes]
 
-        means_c = [np.mean(d_cryo[c]) for c in classes]
-        stds_c  = [np.std(d_cryo[c])  for c in classes]
-        means_n = [np.mean(d_nn[c])   for c in classes]
-        stds_n  = [np.std(d_nn[c])    for c in classes]
+    eb_r = stds_r if len(list(d_rand.values())[0]) > 1 else None
+    eb_n = stds_n if len(list(d_nn.values())[0])   > 1 else None
+    eb_c = stds_c if len(list(d_cryo.values())[0]) > 1 else None
 
-        # Only show error bars if more than 1 sample
-        eb_c = stds_c if len(list(d_cryo.values())[0]) > 1 else None
-        eb_n = stds_n if len(list(d_nn.values())[0])   > 1 else None
+    ax.bar(x - w, means_r, w, yerr=eb_r, color=color_rand,
+           capsize=3, error_kw={'linewidth': 0.8}, zorder=3)
+    ax.bar(x,     means_n, w, yerr=eb_n, color=color_nn,
+           capsize=3, error_kw={'linewidth': 0.8}, zorder=3)
+    ax.bar(x + w, means_c, w, yerr=eb_c, color=color_cryo,
+           capsize=3, error_kw={'linewidth': 0.8}, zorder=3)
 
-        ax.bar(x - w/2, means_c, w, yerr=eb_c, color=color_cryo,
-               capsize=3, error_kw={'linewidth': 0.8}, zorder=3)
-        ax.bar(x + w/2, means_n, w, yerr=eb_n, color=color_nn,
-               capsize=3, error_kw={'linewidth': 0.8}, zorder=3)
+    dot_r = tuple(min(max(v, 0), 1) for v in sns.set_hls_values(color_rand, l=0.35))
+    dot_n = tuple(min(max(v, 0), 1) for v in sns.set_hls_values(color_nn,   l=0.35))
+    dot_c = tuple(min(max(v, 0), 1) for v in sns.set_hls_values(color_cryo, l=0.35))
+    for i, cls in enumerate(classes):
+        ax.scatter(np.full(len(d_rand[cls]), i - w), d_rand[cls],
+                   color=dot_r, zorder=4, s=14, alpha=0.85, edgecolors='none')
+        ax.scatter(np.full(len(d_nn[cls]),   i),     d_nn[cls],
+                   color=dot_n, zorder=4, s=14, alpha=0.85, edgecolors='none')
+        ax.scatter(np.full(len(d_cryo[cls]), i + w), d_cryo[cls],
+                   color=dot_c, zorder=4, s=14, alpha=0.85, edgecolors='none')
 
-        # Individual data points
-        dot_c = tuple(min(max(v, 0), 1) for v in sns.set_hls_values(color_cryo, l=0.35))
-        dot_n = tuple(min(max(v, 0), 1) for v in sns.set_hls_values(color_nn,   l=0.35))
-        for i, cls in enumerate(classes):
-            ax.scatter(np.full(len(d_cryo[cls]), i - w/2), d_cryo[cls],
-                       color=dot_c, zorder=4, s=14, alpha=0.85, edgecolors='none')
-            ax.scatter(np.full(len(d_nn[cls]),   i + w/2), d_nn[cls],
-                       color=dot_n, zorder=4, s=14, alpha=0.85, edgecolors='none')
+    ax.set_xticks(x)
+    ax.set_xticklabels(classes, fontsize=9)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0)
+    ax.set_axisbelow(True)
 
-        ax.set_xticks(x)
-        ax.set_xticklabels(classes, fontsize=9)
-        ax.yaxis.grid(True, linestyle='--', alpha=0.4, zorder=0)
-        ax.set_axisbelow(True)
-
-        all_vals = [v for c in classes for v in list(d_cryo[c]) + list(d_nn[c])]
-        rng = max(all_vals) - min(all_vals) if max(all_vals) != min(all_vals) else max(all_vals)
-        ax.set_ylim(max(0, min(all_vals) - 0.12 * rng),
-                    max(all_vals) + 0.18 * rng)
-
-    # Dataset label on the left of the row
-    axs_row[0].set_ylabel(ds_name, fontsize=10, fontweight='bold', labelpad=8)
+    all_vals = [v for c in classes
+                for v in list(d_rand[c]) + list(d_nn[c]) + list(d_cryo[c])]
+    rng = max(all_vals) - min(all_vals) if max(all_vals) != min(all_vals) else max(all_vals)
+    ax.set_ylim(max(0, min(all_vals) - 0.12 * rng),
+                max(all_vals) + 0.18 * rng)
 
 
 def main(out_dir, name):
     os.makedirs(out_dir, exist_ok=True)
     set_paper_style()
 
-    palette    = sns.color_palette("pastel", n_colors=5)
-    color_cryo = palette[2]
-    color_nn   = palette[3]
+    palette     = sns.color_palette("pastel", n_colors=6)
+    color_cryo  = palette[2]
+    color_nn    = palette[3]
+    color_rand  = palette[4]
 
-    n_rows = len(DATASETS)
-    fig, axs = plt.subplots(n_rows, 2, figsize=(9, 3.5 * n_rows))
+    ds_names = list(DATASETS.keys())
+    n_cols   = len(ds_names)                        # 3 datasets → 3 columns
+    # Layout: 2 rows (Dice top, HD95 bottom) × 3 columns (one per dataset)
+    fig, axs = plt.subplots(2, n_cols, figsize=(4.5 * n_cols, 7))
 
-    for row_idx, (ds_name, ds_data) in enumerate(DATASETS.items()):
-        plot_dataset_row(axs[row_idx], ds_name, ds_data, color_cryo, color_nn)
+    for col_idx, ds_name in enumerate(ds_names):
+        ds_data = DATASETS[ds_name]
+        classes = ds_data["classes"]
 
-    # Column titles on top row only
-    axs[0][0].set_title("Dice Coefficient", fontsize=12, fontweight='bold')
-    axs[0][1].set_title("HD95",             fontsize=12, fontweight='bold')
+        plot_dataset_col(axs[0][col_idx], ds_data, "dice", classes, color_cryo, color_nn, color_rand)
+        plot_dataset_col(axs[1][col_idx], ds_data, "hd95", classes, color_cryo, color_nn, color_rand)
+
+        # Dataset name as column title
+        axs[0][col_idx].set_title(ds_name, fontsize=11, fontweight='bold', pad=6)
+
+    # Row labels on the leftmost column
+    axs[0][0].set_ylabel("Dice Coefficient", fontsize=10, fontweight='bold', labelpad=8)
+    axs[1][0].set_ylabel("HD95",             fontsize=10, fontweight='bold', labelpad=8)
 
     # Single legend at top
     handles = [
-        mpatches.Patch(color=color_cryo, label='CryoDINO (Frozen pre-trained feature model)'),
-        mpatches.Patch(color=color_nn,   label='nnU-Net (Fully supervised)'),
+        mpatches.Patch(color=color_rand,  label='Random Init (Fully supervised, no pretraining)'),
+        mpatches.Patch(color=color_nn,    label='nnU-Net (Fully supervised)'),
+        mpatches.Patch(color=color_cryo,  label='CryoDINO (Frozen pre-trained feature model)'),
     ]
-    fig.legend(handles=handles, loc='upper center', ncol=2,
+    fig.legend(handles=handles, loc='upper center', ncol=3,
                frameon=False, fontsize=9, bbox_to_anchor=(0.5, 1.02))
 
     plt.tight_layout(rect=[0, 0, 1, 0.97])
@@ -175,6 +206,6 @@ def main(out_dir, name):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--out_dir', default='visualization/results')
-    parser.add_argument('-n', '--name',    default='combined_barplot')
+    parser.add_argument('-n', '--name',    default='combined_barplot_with_random_init')
     args = parser.parse_args()
     main(args.out_dir, args.name)
