@@ -404,9 +404,9 @@ If you use CryoDINO in your research, please cite:
 
 ```bibtex
 @article{cryodino2025,
-  title   = {CryoDINO: A 3D Self-Supervised Foundation Model for Cryo-Electron Tomography},
+  title   = {CryoDINO: A generalizable 3D foundation model for Cryo-electron tomography},
   author  = {Attarpour, Ahmadreza and others},
-  year    = {2025}
+  year    = {2026}
 }
 ```
 
@@ -420,7 +420,3 @@ The underlying 3DINO framework:
 ```
 
 ---
-
-<p align="center">
-  Developed by <a href="mailto:attarpour1993@gmail.com">Ahmadreza Attarpour</a>
-</p>

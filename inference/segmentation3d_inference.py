@@ -1,4 +1,5 @@
 """
+Author: Ahmadreza Attarpour
 3DINO Segmentation Inference Script
 
 Runs sliding window inference using a pretrained 3DINO backbone + trained segmentation head
