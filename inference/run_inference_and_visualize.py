@@ -1,47 +1,35 @@
 """
+Author: Ahmadreza Attarpour & Sumin Kim
 Run CryoDINO segmentation inference on NIfTI volumes and visualize in napari.
 
 Loads a pretrained 3DINO backbone + trained segmentation head, runs sliding
 window inference on one or more NIfTI volumes, saves predicted segmentation
 masks, and opens the results in an interactive napari 3D viewer.
 
-python scripts/run_inference_and_visualize.py \
-    --input /home/sumin/Downloads/CryoET/cropped_001/patch_0000.nii.gz \
-    --pretrained-weights /home/sumin/Downloads/CryoDINO_checkpoints/teacher_checkpoint.pth \
-    --checkpoint /home/sumin/Downloads/CryoDINO_checkpoints/ssl3d_run_h100_high_res_training_9374_Dataset001_CZII_10001_patches512_vit_adapter/best_model.pth \
-    --run-inference
 Usage:
-  # Run inference then visualize (required args)
-  python scripts/run_inference_and_visualize.py \
+  # Run inference then visualize
+  python inference/run_inference_and_visualize.py \
     --input /path/to/TS_0002_0000.nii.gz \
     --pretrained-weights /path/to/teacher_checkpoint.pth \
     --checkpoint /path/to/best_model.pth \
     --run-inference
 
   # Multiple input files
-  python scripts/run_inference_and_visualize.py \
+  python inference/run_inference_and_visualize.py \
     --input /path/to/TS_0003_0000.nii.gz /path/to/TS_0004_0000.nii.gz \
     --pretrained-weights /path/to/teacher_checkpoint.pth \
     --checkpoint /path/to/best_model.pth \
     --run-inference
 
-  # With ground-truth labels for dice metrics
-  python scripts/run_inference_and_visualize.py \
-    --input /path/to/TS_0002_0000.nii.gz \
-    --pretrained-weights /path/to/teacher_checkpoint.pth \
-    --checkpoint /path/to/best_model.pth \
-    --label-dir /path/to/labelsTr/ \
-    --run-inference
-
   # Skip visualization (inference only)
-  python scripts/run_inference_and_visualize.py \
+  python inference/run_inference_and_visualize.py \
     --input /path/to/TS_0002_0000.nii.gz \
     --pretrained-weights /path/to/teacher_checkpoint.pth \
     --checkpoint /path/to/best_model.pth \
     --run-inference --no-viewer
 
   # Visualize existing predictions (no inference)
-  python scripts/run_inference_and_visualize.py \
+  python inference/run_inference_and_visualize.py \
     --input /path/to/TS_0002_0000.nii.gz \
     --pretrained-weights /path/to/teacher_checkpoint.pth \
     --checkpoint /path/to/best_model.pth
@@ -51,7 +39,6 @@ import os
 import sys
 import gc
 import argparse
-import json
 
 import numpy as np
 
@@ -107,10 +94,6 @@ def get_args_parser():
     parser.add_argument(
         "--output-dir", type=str, default="./output",
         help="Directory to save predictions (default: ./output)",
-    )
-    parser.add_argument(
-        "--label-dir", type=str, default=None,
-        help="Optional label directory for dice metric computation",
     )
     parser.add_argument(
         "--overlap", type=float, default=0.75,
@@ -171,7 +154,7 @@ def run_inference(args):
 
     from monai.transforms import (
         Compose, LoadImage, EnsureChannelFirst,
-        ScaleIntensityRangePercentiles, EnsureType,
+        ScaleIntensityRangePercentiles, EnsureType, Lambda,
     )
     from monai.inferers import sliding_window_inference
     from dinov2.eval.setup import get_args_parser as get_base_args_parser, setup_and_build_model_3d
@@ -180,19 +163,13 @@ def run_inference(args):
     )
     from visualization._napari_utils import SampleData, load_nifti_volume
 
-    # Build transforms
+    # Build transforms:
+    #   1. Z-score normalise the whole tomogram
+    #   2. Per-patch percentile [-1, 1] applied inside the sliding-window predictor
     image_transforms = Compose([
         LoadImage(image_only=True),
         EnsureChannelFirst(),
-        ScaleIntensityRangePercentiles(
-            lower=0.5, upper=99.5, b_min=-1, b_max=1,
-            clip=True, relative=False,
-        ),
-        EnsureType(),
-    ])
-    label_transforms = Compose([
-        LoadImage(image_only=True),
-        EnsureChannelFirst(),
+        Lambda(func=lambda x: (x - x.mean()) / (x.std() + 1e-8)),  # z-score whole tomo
         EnsureType(),
     ])
 
@@ -224,20 +201,20 @@ def run_inference(args):
     seg_model.cuda()
     seg_model.eval()
 
-    image_size = (args.image_size,) * 3
+    # Wrap model to apply per-patch percentile [-1, 1] normalisation inside
+    # the sliding window — matches the patchwise normalisation used during training.
+    patch_normalize = ScaleIntensityRangePercentiles(
+        lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False,
+    )
+    def patchwise_predictor(patch_data):
+        patch_data = torch.stack([patch_normalize(patch_data[i]) for i in range(patch_data.shape[0])])
+        return seg_model(patch_data)
 
-    def find_label(img_path):
-        if not args.label_dir:
-            return None
-        fname = os.path.basename(img_path)
-        label_name = fname.replace("_0000.nii.gz", ".nii.gz").replace("_0000.nii", ".nii")
-        candidate = os.path.join(args.label_dir, label_name)
-        return candidate if os.path.exists(candidate) else None
+    image_size = (args.image_size,) * 3
 
     print(f"Processing {len(args.input)} file(s)...")
 
     viz_samples = []
-    results = {}
 
     with torch.no_grad():
         for img_path in args.input:
@@ -249,7 +226,7 @@ def run_inference(args):
 
             logits = sliding_window_inference(
                 img, image_size, args.batch_size,
-                seg_model, overlap=args.overlap,
+                patchwise_predictor, overlap=args.overlap,
             )
 
             pred = torch.argmax(logits, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
@@ -262,63 +239,13 @@ def run_inference(args):
             nib.save(pred_nifti, out_path)
             print(f"  Saved: {out_path}")
 
-            # Compute dice if labels available
-            label_path = find_label(img_path)
-            sample_metrics = {}
-            if label_path:
-                from dinov2.eval.segmentation_3d.metrics import CryoMetrics4, LASEGMetrics
-                if args.num_classes == 2:
-                    metric = LASEGMetrics()
-                elif args.num_classes == 4:
-                    metric = CryoMetrics4()
-                else:
-                    from dinov2.eval.segmentation_3d.metrics import BTCVMetrics
-                    from monai.transforms import AsDiscrete
-                    metric = BTCVMetrics()
-                    metric.post_label = AsDiscrete(to_onehot=args.num_classes)
-                    metric.post_pred = AsDiscrete(argmax=True, to_onehot=args.num_classes)
-
-                label = label_transforms(label_path)
-                label = torch.as_tensor(label).unsqueeze(0).cuda()
-                logits_t = torch.tensor(logits.cpu().numpy()).cuda()
-                label_t = torch.tensor(label.cpu().numpy()).cuda()
-                avg_dice, per_cls_dice = metric(logits_t, label_t)
-                per_cls_dice = [float(d) for d in per_cls_dice]
-                sample_metrics = {"avg_dice": float(avg_dice), "per_class_dice": per_cls_dice}
-                results[fname] = sample_metrics
-                print(f"  Dice: {avg_dice:.4f}, Per-class: {per_cls_dice}")
-
-            # Collect for napari
-            raw_image = load_nifti_volume(img_path)
-            lbl_array = load_nifti_volume(label_path) if label_path else None
             viz_samples.append(SampleData(
                 name=fname,
-                image=raw_image,
+                image=load_nifti_volume(img_path),
                 prediction=pred,
-                label=lbl_array,
-                metrics=sample_metrics,
             ))
 
             clear_cuda_memory()
-
-    # Save metrics if any
-    if results:
-        all_avg = np.mean([r["avg_dice"] for r in results.values()])
-        num_cls = len(next(iter(results.values()))["per_class_dice"])
-        all_per_cls = [
-            np.mean([r["per_class_dice"][c] for r in results.values()])
-            for c in range(num_cls)
-        ]
-        metrics_out = {
-            "per_image": results,
-            "overall_avg_dice": float(all_avg),
-            "overall_per_class_dice": [float(d) for d in all_per_cls],
-        }
-        metrics_path = os.path.join(args.output_dir, "metrics.json")
-        with open(metrics_path, "w") as f:
-            json.dump(metrics_out, f, indent=2)
-        print(f"\nOverall Dice: {all_avg:.4f}")
-        print(f"Metrics saved to: {metrics_path}")
 
     print(f"\nPredictions saved to: {args.output_dir}")
 
@@ -341,14 +268,6 @@ def load_existing_results(args):
     """Load saved predictions from output dir for visualization."""
     from visualization._napari_utils import SampleData, load_nifti_volume
 
-    # Load metrics if available
-    metrics_path = os.path.join(args.output_dir, "metrics.json")
-    per_image_metrics = {}
-    if os.path.exists(metrics_path):
-        with open(metrics_path) as f:
-            data = json.load(f)
-        per_image_metrics = data.get("per_image", {})
-
     viz_samples = []
     for img_path in args.input:
         fname = os.path.basename(img_path)
@@ -359,23 +278,10 @@ def load_existing_results(args):
             print(f"  Warning: no prediction found for {fname} at {pred_path}, skipping")
             continue
 
-        raw_image = load_nifti_volume(img_path)
-        pred = load_nifti_volume(pred_path)
-
-        lbl_array = None
-        if args.label_dir:
-            lbl_path = os.path.join(args.label_dir, out_name)
-            if os.path.exists(lbl_path):
-                lbl_array = load_nifti_volume(lbl_path)
-
-        metrics = per_image_metrics.get(fname, per_image_metrics.get(out_name, {}))
-
         viz_samples.append(SampleData(
             name=fname,
-            image=raw_image,
-            prediction=pred,
-            label=lbl_array,
-            metrics=metrics,
+            image=load_nifti_volume(img_path),
+            prediction=load_nifti_volume(pred_path),
         ))
 
     print(f"Loaded {len(viz_samples)} sample(s) from {args.output_dir}")

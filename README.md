@@ -336,6 +336,55 @@ An interactive notebook for exploring learned representations without labels —
 jupyter notebook visualization/unsupervised_vis.ipynb
 ```
 
+### Interactive napari Viewer
+
+For a more interactive inspection of segmentation results, CryoDINO integrates a [napari](https://napari.org)-based 3D viewer. Two usage modes are provided:
+
+**Mode 1: Run inference and visualize in one step**
+
+Loads the model, runs sliding-window inference on one or more tomograms, saves predictions, and immediately opens the napari viewer:
+
+```bash
+python inference/run_inference_and_visualize.py \
+    --input              /path/to/TS_0002_0000.nii.gz \
+    --pretrained-weights /path/to/teacher_checkpoint.pth \
+    --checkpoint         /path/to/best_model.pth \
+    --run-inference
+```
+
+Multiple inputs and additional options:
+
+```bash
+python inference/run_inference_and_visualize.py \
+    --input              /path/to/TS_0002_0000.nii.gz /path/to/TS_0003_0000.nii.gz \
+    --pretrained-weights /path/to/teacher_checkpoint.pth \
+    --checkpoint         /path/to/best_model.pth \
+    --segmentation-head  ViTAdapterUNETR \   # UNETR | Linear | ViTAdapterUNETR
+    --num-classes        4 \
+    --image-size         112 \
+    --overlap            0.75 \
+    --output-dir         ./output \
+    --run-inference
+```
+
+Add `--no-viewer` to skip napari and save predictions only.
+
+**Mode 2: Visualize existing predictions (no GPU needed)**
+
+If inference has already been run, browse saved predictions without reloading the model:
+
+```bash
+python visualization/napari_viewer.py \
+    --pred-dir   /path/to/inference_output/ \
+    --image-dir  /path/to/raw_tomograms/
+```
+
+**The napari interface provides:**
+- Sample dropdown and Prev / Next navigation across multiple tomograms
+- Z-slice spinbox synchronized with the viewer scroll axis
+- Overlaid prediction labels (toggle visibility per layer)
+- Raw tomogram displayed as a grayscale underlay
+
 ---
 
 ## License
