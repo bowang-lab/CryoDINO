@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-h100hr-9374-patches-512-vit
+#SBATCH -J 3dino-ft-patches-pretrain-aug
 #SBATCH -p gpu_bwanggroup
 #SBATCH -t 6-00:00:00
 #SBATCH --account=bwanggroup_gpu
@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
-#SBATCH --mem=200G
+#SBATCH --mem=220G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
@@ -15,7 +15,7 @@
 # =========================
 # Fine-tuning: h100_high_res training_9374
 # Pre-extracted 512^3 patches (.pt), 4 crop per patch, batch size 2
-# Frozen ViT, Dataset001 + Dataset010
+# Frozen ViT, Dataset001 + Dataset010, EMPIAR_10989, EMPIAR_12049, with ViTAdapterUNETR head
 # =========================
 
 date
@@ -26,7 +26,7 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET || exit 1
+cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
 
 # =========================
 # Re-generate patches (all patches, no fg threshold, with zscore)
@@ -67,7 +67,7 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoET || exit 1
 
 # done
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
+cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 # =========================
 # Fixed Parameters
@@ -120,7 +120,7 @@ DATASETS=(
 
 for DATASET_NAME in "${DATASETS[@]}"; do
 
-    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_increased_conv"
+    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_pretrain_aug"
     CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
 
     # Clean old cache and output

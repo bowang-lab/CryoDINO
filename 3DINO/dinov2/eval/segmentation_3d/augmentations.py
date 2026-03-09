@@ -562,6 +562,8 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
             ScaleIntensityRangePercentilesd,
             OneOf,
             RandGaussianSmoothd,
+            RandGaussianSharpend,
+            RandGibbsNoised,
             RandGaussianNoised,
             RandFlipd,
             RandShiftIntensityd,
@@ -639,32 +641,63 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
             #         out[x == 4] = 3
             #         return out.float()
             #     load_transforms.append(Lambdad(keys=["label"], func=_remap_12049))
+            # train_transforms = Compose(
+            #     load_transforms + [
+            #         RandCropByPosNegLabeld(
+            #             keys=["image", "label"], label_key="label",
+            #             spatial_size=crop_size, pos=5, neg=1,
+            #             num_samples=N_crops, image_key="image", image_threshold=-1,
+            #         ),
+            #         ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
+            #         OneOf(transforms=[
+            #             RandomAffine(include=["image", "label"], p=data_aug_prob, degrees=(30,30,30),
+            #                         scales=(0.5, 2), translation=(0.1,0.1,0.1),
+            #                         default_pad_value='mean'),
+            #             random_salt_pepper(),
+            #             RandAdjustContrastd(keys=["image"], prob=data_aug_prob, gamma=(0.5, 4)),
+            #             RandGaussianSmoothd(keys=["image"], prob=data_aug_prob),
+            #             RandGaussianNoised(keys=["image"], prob=data_aug_prob, std=0.02),
+            #             RandHistogramShiftd(keys=["image"], num_control_points=10, prob=data_aug_prob),
+            #         ]),
+            #         OneOf([
+            #             RandScaleIntensityd(keys=["image"], factors=(1/1.1, 1.1), prob=1.0),
+            #             RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=1.0)
+            #         ]),
+            #         RandAxisFlipd(keys=["image", "label"], prob=data_aug_prob),
+            #         EnsureTyped(keys=["image", "label"]),
+            #     ]
+            # )
+
+            ## AA EXPERIMENT: pretraining-matched augmentations
+            # Geometric: per-axis flips (prob=0.3) + 90° rotations on all 3 planes (prob=0.3) — no affine/scale deformation
+            # Intensity: sequential RandAdjustContrast → RandGaussianSmooth → RandScaleIntensity → RandShiftIntensity → RandGaussianNoise (same params as pretraining)
             train_transforms = Compose(
                 load_transforms + [
                     RandCropByPosNegLabeld(
                         keys=["image", "label"], label_key="label",
-                        spatial_size=crop_size, pos=5, neg=1,
+                        spatial_size=crop_size, pos=3, neg=1,
                         num_samples=N_crops, image_key="image", image_threshold=-1,
                     ),
                     ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
-                    OneOf(transforms=[
-                        RandomAffine(include=["image", "label"], p=data_aug_prob, degrees=(30,30,30),
-                                    scales=(0.5, 2), translation=(0.1,0.1,0.1),
-                                    default_pad_value='mean'),
-                        random_salt_pepper(),
-                        RandAdjustContrastd(keys=["image"], prob=data_aug_prob, gamma=(0.5, 4)),
-                        RandGaussianSmoothd(keys=["image"], prob=data_aug_prob),
-                        RandGaussianNoised(keys=["image"], prob=data_aug_prob, std=0.02),
-                        RandHistogramShiftd(keys=["image"], num_control_points=10, prob=data_aug_prob),
-                    ]),
+                    RandFlipd(keys=["image", "label"], spatial_axis=[0], prob=0.3),
+                    RandFlipd(keys=["image", "label"], spatial_axis=[1], prob=0.3),
+                    RandFlipd(keys=["image", "label"], spatial_axis=[2], prob=0.3),
+                    RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 1)),
+                    RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(1, 2)),
+                    RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 2)),
+                    RandAdjustContrastd(keys=["image"], prob=0.8, gamma=(0.5, 2)),
                     OneOf([
-                        RandScaleIntensityd(keys=["image"], factors=(1/1.1, 1.1), prob=1.0),
-                        RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=1.0)
+                        RandGaussianSmoothd(keys=["image"], prob=0.1),
+                        RandGaussianSharpend(keys=["image"], prob=0.1),
                     ]),
-                    RandAxisFlipd(keys=["image", "label"], prob=data_aug_prob),
+                    RandGibbsNoised(keys=["image"], prob=0.2),
+                    RandScaleIntensityd(keys=["image"], factors=(1/1.1, 1.1), prob=1.0),
+                    RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=1.0),
+                    RandGaussianNoised(keys=["image"], prob=1.0, std=0.002),
                     EnsureTyped(keys=["image", "label"]),
                 ]
             )
+            ## AA EXPERIMENT END
         else:
             # NIfTI mode: standard MONAI loading with tomogram-level intensity normalization
             # Note: per-crop normalization (after cropping) was tested but performed worse, so keeping tomogram-level
