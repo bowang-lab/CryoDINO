@@ -620,6 +620,7 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
                 ]
             )
         elif "patches" in dataset_name:
+            Pos_ratio = 10 if "12049" in dataset_name else 3  # for Dataset049 (12049), use more aggressive foreground sampling due to smaller fg regions; for Dataset010 (10010) and Dataset10001 (10001), use more balanced sampling
             if "10001" in dataset_name:
                 N_crops = 3
             else:
@@ -675,7 +676,7 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
                 load_transforms + [
                     RandCropByPosNegLabeld(
                         keys=["image", "label"], label_key="label",
-                        spatial_size=crop_size, pos=3, neg=1,
+                        spatial_size=crop_size, pos=Pos_ratio, neg=1,
                         num_samples=N_crops, image_key="image", image_threshold=-1,
                     ),
                     ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),

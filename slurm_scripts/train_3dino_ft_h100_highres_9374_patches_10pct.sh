@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-h100hr-9374-patches-512-10pct-vit-increased-conv
+#SBATCH -J 3dino-ft-patches-pretrain-aug-10pct
 #SBATCH -p gpu_bwanggroup
 #SBATCH -t 6-00:00:00
 #SBATCH --account=bwanggroup_gpu
@@ -90,7 +90,7 @@ for i in "${!DATASETS[@]}"; do
     DATASET_NAME="${DATASETS[$i]}"
     CACHE_DATASET="${CACHE_DATASETS[$i]}"
 
-    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_increased_conv"
+    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_pretrain_aug"
     CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${CACHE_DATASET}"
 
     mkdir -p "$CACHE_DIR"

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-h100hr-9374-patches-512-50pct-vit
+#SBATCH -J 3dino-ft-patches-pretrain-aug-50pct
 #SBATCH -p gpu_bwanggroup
 #SBATCH -t 6-00:00:00
 #SBATCH --account=bwanggroup_gpu
@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
-#SBATCH --mem=200G
+#SBATCH --mem=220G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
@@ -26,7 +26,7 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
+cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 # =========================
 # Fixed Parameters
@@ -43,7 +43,7 @@ EVAL_ITERS=600
 WARMUP_ITERS=3000
 IMAGE_SIZE=112
 BATCH_SIZE=2
-NUM_WORKERS=7
+NUM_WORKERS=10
 LEARNING_RATE=1e-4
 CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0
@@ -72,15 +72,17 @@ mkdir -p "$BASE_OUTPUT_DIR"
 
 DATASETS=(
     "Dataset001_CZII_10001_patches512_50percent"
-    # "Dataset010_CZII_10010_patches512_50percent"
-    # "Dataset989_EMPIAR_10989_transposed_patches512_50percent"
+    "Dataset010_CZII_10010_patches512_50percent"
+    "Dataset989_EMPIAR_10989_transposed_patches512_50percent"
+    "Dataset049_EMPIAR_12049_transposed_patches512_50percent"
     )
 
 # Base dataset names for cache reuse (shares cache with 100% runs)
 CACHE_DATASETS=(
     "Dataset001_CZII_10001_patches512"
-    # "Dataset010_CZII_10010_patches512"
-    # "Dataset989_EMPIAR_10989_transposed_patches512"
+    "Dataset010_CZII_10010_patches512"
+    "Dataset989_EMPIAR_10989_transposed_patches512"
+    "Dataset049_EMPIAR_12049_transposed_patches512"
     )
 
 for i in "${!DATASETS[@]}"; do
@@ -88,7 +90,7 @@ for i in "${!DATASETS[@]}"; do
     DATASET_NAME="${DATASETS[$i]}"
     CACHE_DATASET="${CACHE_DATASETS[$i]}"
 
-    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter"
+    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_pretrain_aug"
     CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${CACHE_DATASET}"
 
     mkdir -p "$CACHE_DIR"
