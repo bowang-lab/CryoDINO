@@ -18,7 +18,7 @@ class UNETRHead(nn.Module):
         self.input_channels = input_channels
         self.feature_model = feature_model
         self.hidden_size = self.feature_model.num_features
-        self.feature_size = 64
+        self.feature_size = 32
 
         self.patch_size = self.feature_model.patch_embed.patch_size
         self.feat_size = [image_size // p for p in self.patch_size]
@@ -231,7 +231,7 @@ class ViTAdapterUNETRHead(nn.Module):
         self.input_channels = input_channels
         self.feature_model = ViTAdapter(feature_model, input_channels)
         self.hidden_size = self.feature_model.vit_model.num_features
-        self.feature_size = 64
+        self.feature_size = 32
         self.patch_size = self.feature_model.vit_model.patch_embed.patch_size
         self.feat_size = [image_size // p for p in self.patch_size]
 

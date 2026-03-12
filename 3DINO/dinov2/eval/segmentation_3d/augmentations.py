@@ -620,7 +620,7 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
                 ]
             )
         elif "patches" in dataset_name:
-            Pos_ratio = 10 if "12049" in dataset_name else 3  # for Dataset049 (12049), use more aggressive foreground sampling due to smaller fg regions; for Dataset010 (10010) and Dataset10001 (10001), use more balanced sampling
+            Pos_ratio = 3
             if "10001" in dataset_name:
                 N_crops = 3
             else:
