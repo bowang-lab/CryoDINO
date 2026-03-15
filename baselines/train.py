@@ -9,15 +9,21 @@
 #   dinov2 package is resolvable (matches how segmentation3d.py is launched):
 #
 #     cd /path/to/CryoDINO/3DINO
-#     PYTHONPATH=. torchrun --nproc_per_node=1 ../baselines/train.py \
+#     PYTHONPATH=. python ../baselines/train.py <args>
+#
+#   Uses standard PyTorch DataLoader (no distributed/DDP required), so plain
+#   python is sufficient — no torchrun needed. The training loop cycles over
+#   the dataset infinitely until max_iter (epochs * epoch_length) is reached.
+#   Alternative: call torch.distributed.init_process_group(backend="nccl") at
+#   startup and use torchrun to enable multi-GPU DDP training.
 #
 #   Full example:
-#   torchrun --nproc_per_node=1 ../baselines/train.py \
+#   PYTHONPATH=. python ../baselines/train.py \
 #       --model_name unet \                         # or "unetr"
-#       --dataset_name Dataset001_CZII_10001_transposed_patches512 \
-#       --base_data_dir /path/to/datalists \
-#       --output_dir /path/to/output \
-#       --cache_dir /path/to/cache \
+#       --dataset_name Dataset001_CZII_10001_patches512 \
+#       --base_data_dir /cluster/projects/bwanggroup/reza/projects/cryoet/experiments \
+#       --output_dir /cluster/projects/bwanggroup/reza/projects/cryoet/experiments/baselines/unet_Dataset001 \
+#       --cache_dir /cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream/baseline_Dataset001 \
 #       --image_size 112 \
 #       --epochs 100 \
 #       --epoch_length 300 \
@@ -45,12 +51,11 @@ from monai.networks.layers import Norm
 from monai.losses import DiceCELoss
 from monai.optimizers import WarmupCosineSchedule
 from monai.data.utils import list_data_collate
-from monai.config import print_config
 
 from dinov2.eval.segmentation_3d.augmentations import make_transforms
 from dinov2.eval.segmentation_3d.metrics import get_metric
-from dinov2.data import SamplerType, make_data_loader
 from dinov2.data.loaders import make_segmentation_dataset_3d
+from torch.utils.data import DataLoader
 from dinov2.eval.segmentation3d import train_iter, val_iter, clear_cuda_memory
 
 set_determinism(seed=0)
@@ -135,7 +140,6 @@ def print_run_info(args, num_classes):
 
 
 def main(args):
-    print_config()
     os.makedirs(args.output_dir, exist_ok=True)
 
     train_transforms, val_transforms = make_transforms(
@@ -154,38 +158,30 @@ def main(args):
         args.batch_size
     )
     print_run_info(args, num_classes)
-    train_loader = make_data_loader(
-        dataset=train_ds,
+    train_loader = DataLoader(
+        train_ds,
         batch_size=args.batch_size,
-        num_workers=args.num_workers,
         shuffle=True,
-        seed=0,
-        sampler_type=SamplerType.SHARDED_INFINITE,
-        drop_last=False,
+        num_workers=args.num_workers,
+        collate_fn=list_data_collate,
         persistent_workers=True,
-        collate_fn=list_data_collate
-    )
-    val_loader = make_data_loader(
-        dataset=val_ds,
-        batch_size=1,
-        num_workers=args.num_workers,
-        shuffle=False,
-        seed=0,
-        sampler_type=SamplerType.DISTRIBUTED,
         drop_last=False,
-        persistent_workers=False,
-        collate_fn=list_data_collate
     )
-    test_loader = make_data_loader(
-        dataset=test_ds,
+    val_loader = DataLoader(
+        val_ds,
         batch_size=1,
-        num_workers=args.num_workers,
         shuffle=False,
-        seed=0,
-        sampler_type=SamplerType.DISTRIBUTED,
-        drop_last=False,
+        num_workers=args.num_workers,
+        collate_fn=list_data_collate,
         persistent_workers=False,
-        collate_fn=list_data_collate
+    )
+    test_loader = DataLoader(
+        test_ds,
+        batch_size=1,
+        shuffle=False,
+        num_workers=args.num_workers,
+        collate_fn=list_data_collate,
+        persistent_workers=False,
     )
 
     seg_model = get_model(args.model_name, num_classes, args.image_size)
@@ -206,8 +202,13 @@ def main(args):
     val_dice_list = []
     val_per_cls_dice_list = []
 
+    def infinite_loader(loader):
+        while True:
+            for batch in loader:
+                yield batch
+
     seg_model.train()
-    for it, train_data in enumerate(train_loader):
+    for it, train_data in enumerate(infinite_loader(train_loader)):
 
         train_loss = train_iter(
             model=seg_model,
