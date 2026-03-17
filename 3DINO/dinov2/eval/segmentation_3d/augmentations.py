@@ -325,6 +325,68 @@ class CropFromB2NDd(RandomizableTransform):
 
         return results
 ## AA CHANGE: end of new dataset-specific transforms
+
+
+class RandInvertedGammad(MapTransform):
+    """nnUNet GammaTransform with invert_image=True.
+    Normalizes to [0,1], applies 1-(1-x)^gamma, rescales to original range.
+    """
+    def __init__(self, keys, prob=0.1, gamma_range=(0.7, 1.5), allow_missing_keys=False):
+        super().__init__(keys, allow_missing_keys)
+        self.prob = prob
+        self.gamma_range = gamma_range
+
+    def __call__(self, data):
+        d = dict(data)
+        if np.random.random() >= self.prob:
+            return d
+        gamma = np.random.uniform(self.gamma_range[0], self.gamma_range[1])
+        for key in self.keys:
+            img = d[key].float()
+            img_min, img_max = img.min(), img.max()
+            img_range = img_max - img_min
+            if img_range < 1e-8:
+                continue
+            img_norm = (img - img_min) / img_range
+            d[key] = (1.0 - (1.0 - img_norm).clamp(0, 1) ** gamma) * img_range + img_min
+        return d
+
+
+class SimulateLowResolutiond(MapTransform):
+    """nnUNet SimulateLowResolutionTransform (matched).
+    Downsamples with nearest-exact then upsamples back with trilinear.
+    Single-channel images: one zoom sampled per call, applied to all spatial dims.
+    Applied to image keys only — label is unchanged.
+
+    Args:
+        keys: image keys only (label not affected)
+        zoom_range: (min, max) zoom factor
+        prob: overall probability of applying transform (nnUNet: 0.25)
+    """
+    def __init__(self, keys, zoom_range=(0.5, 1.0), prob=0.25, allow_missing_keys=False):
+        super().__init__(keys, allow_missing_keys)
+        self.zoom_range = zoom_range
+        self.prob = prob
+
+    def __call__(self, data):
+        d = dict(data)
+        if np.random.random() >= self.prob:
+            return d
+        zoom = np.random.uniform(self.zoom_range[0], self.zoom_range[1])
+        for key in self.keys:
+            img = d[key].float()       # (C, H, W, D)
+            orig_size = img.shape[1:]
+            new_shape = [max(1, round(s * zoom)) for s in orig_size]
+            downsampled = torch.nn.functional.interpolate(
+                img[None], new_shape, mode='nearest-exact'
+            )
+            up = torch.nn.functional.interpolate(
+                downsampled, orig_size, mode='trilinear', align_corners=False
+            )[0]
+            d[key] = up.to(d[key].dtype)
+        return d
+
+
 def make_transforms(dataset_name, image_size, resize_scale, min_int):
 
     if dataset_name == 'BTCV':
@@ -672,6 +734,47 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
             ## AA EXPERIMENT: pretraining-matched augmentations
             # Geometric: per-axis flips (prob=0.3) + 90° rotations on all 3 planes (prob=0.3) — no affine/scale deformation
             # Intensity: sequential RandAdjustContrast → RandGaussianSmooth → RandScaleIntensity → RandShiftIntensity → RandGaussianNoise (same params as pretraining)
+            # train_transforms = Compose(
+            #     load_transforms + [
+            #         RandCropByPosNegLabeld(
+            #             keys=["image", "label"], label_key="label",
+            #             spatial_size=crop_size, pos=Pos_ratio, neg=1,
+            #             num_samples=N_crops, image_key="image", image_threshold=-1,
+            #         ),
+            #         ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
+            #         RandFlipd(keys=["image", "label"], spatial_axis=[0], prob=0.3),
+            #         RandFlipd(keys=["image", "label"], spatial_axis=[1], prob=0.3),
+            #         RandFlipd(keys=["image", "label"], spatial_axis=[2], prob=0.3),
+            #         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 1)),
+            #         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(1, 2)),
+            #         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 2)),
+            #         RandAdjustContrastd(keys=["image"], prob=0.8, gamma=(0.5, 2)),
+            #         OneOf([
+            #             RandGaussianSmoothd(keys=["image"], prob=0.1),
+            #             RandGaussianSharpend(keys=["image"], prob=0.1),
+            #         ]),
+            #         RandGibbsNoised(keys=["image"], prob=0.2),
+            #         RandScaleIntensityd(keys=["image"], factors=(1/1.1, 1.1), prob=1.0),
+            #         RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=1.0),
+            #         RandGaussianNoised(keys=["image"], prob=1.0, std=0.002),
+            #         EnsureTyped(keys=["image", "label"]),
+            #     ]
+            # )
+            ## AA EXPERIMENT END
+
+            ## AA EXPERIMENT 2: nnU-Net-matched augmentations (order matches nnUNet pipeline)
+            # Order follows nnUNet 3D full-res augmentation pipeline:
+            #  1. SpatialTransform   : RandomAffine (p=0.2, ±30°, scale 0.7–1.4); elastic DISABLED
+            #  2. GaussianNoise      : p=0.1, std=0.1
+            #  3. GaussianBlur       : p=0.2, σ=0.5–1.0
+            #  4. BrightnessMult     : p=0.15, ×0.75–1.25
+            #  5. ContrastTransform  : p=0.15, γ=0.75–1.25
+            #  6. SimulateLowRes     : p=0.25, zoom=0.5–1.0
+            #  7. GammaTransform inv : p=0.1,  γ=0.7–1.5
+            #  8. GammaTransform     : p=0.3,  γ=0.7–1.5
+            #  9. MirrorTransform    : p=0.5 per axis
+            # Extra (pretraining-matched, after nnUNet pipeline):
+            #     RandRotate90 (p=0.3, all planes), GibbsNoise (p=0.2), ShiftIntensity (p=0.15)
             train_transforms = Compose(
                 load_transforms + [
                     RandCropByPosNegLabeld(
@@ -680,25 +783,40 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
                         num_samples=N_crops, image_key="image", image_threshold=-1,
                     ),
                     ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
-                    RandFlipd(keys=["image", "label"], spatial_axis=[0], prob=0.3),
-                    RandFlipd(keys=["image", "label"], spatial_axis=[1], prob=0.3),
-                    RandFlipd(keys=["image", "label"], spatial_axis=[2], prob=0.3),
+                    # 1. SpatialTransform (rotation p=0.2 ±30°, scale p=0.2 0.7–1.4; elastic disabled for 3D full-res)
+                    RandomAffine(include=["image", "label"], p=0.2,
+                                 degrees=(30, 30, 30),
+                                 scales=(0.7, 1.4),
+                                 default_pad_value='mean'),
+                    # 2. GaussianNoise
+                    RandGaussianNoised(keys=["image"], prob=0.1, std=0.1),
+                    # 3. GaussianBlur
+                    RandGaussianSmoothd(keys=["image"], prob=0.2,
+                                        sigma_x=(0.5, 1.0), sigma_y=(0.5, 1.0), sigma_z=(0.5, 1.0)),
+                    # 4. MultiplicativeBrightness
+                    RandScaleIntensityd(keys=["image"], factors=0.25, prob=0.15),
+                    # 5. ContrastTransform
+                    RandAdjustContrastd(keys=["image"], prob=0.15, gamma=(0.75, 1.25)),
+                    # 6. SimulateLowResolution
+                    SimulateLowResolutiond(keys=["image"], zoom_range=(0.5, 1.0), prob=0.25),
+                    # 7. GammaTransform (inverted)
+                    RandInvertedGammad(keys=["image"], prob=0.1, gamma_range=(0.7, 1.5)),
+                    # 8. GammaTransform (regular)
+                    RandAdjustContrastd(keys=["image"], prob=0.3, gamma=(0.7, 1.5)),
+                    # 9. MirrorTransform
+                    RandFlipd(keys=["image", "label"], spatial_axis=[0], prob=0.5),
+                    RandFlipd(keys=["image", "label"], spatial_axis=[1], prob=0.5),
+                    RandFlipd(keys=["image", "label"], spatial_axis=[2], prob=0.5),
+                    # Extra: pretraining-matched
                     RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 1)),
                     RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(1, 2)),
                     RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 2)),
-                    RandAdjustContrastd(keys=["image"], prob=0.8, gamma=(0.5, 2)),
-                    OneOf([
-                        RandGaussianSmoothd(keys=["image"], prob=0.1),
-                        RandGaussianSharpend(keys=["image"], prob=0.1),
-                    ]),
                     RandGibbsNoised(keys=["image"], prob=0.2),
-                    RandScaleIntensityd(keys=["image"], factors=(1/1.1, 1.1), prob=1.0),
-                    RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=1.0),
-                    RandGaussianNoised(keys=["image"], prob=1.0, std=0.002),
+                    RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=0.15),
                     EnsureTyped(keys=["image", "label"]),
                 ]
             )
-            ## AA EXPERIMENT END
+            ## AA EXPERIMENT 2 END
         else:
             # NIfTI mode: standard MONAI loading with tomogram-level intensity normalization
             # Note: per-crop normalization (after cropping) was tested but performed worse, so keeping tomogram-level
