@@ -734,32 +734,32 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
             ## AA EXPERIMENT: pretraining-matched augmentations
             # Geometric: per-axis flips (prob=0.3) + 90° rotations on all 3 planes (prob=0.3) — no affine/scale deformation
             # Intensity: sequential RandAdjustContrast → RandGaussianSmooth → RandScaleIntensity → RandShiftIntensity → RandGaussianNoise (same params as pretraining)
-            # train_transforms = Compose(
-            #     load_transforms + [
-            #         RandCropByPosNegLabeld(
-            #             keys=["image", "label"], label_key="label",
-            #             spatial_size=crop_size, pos=Pos_ratio, neg=1,
-            #             num_samples=N_crops, image_key="image", image_threshold=-1,
-            #         ),
-            #         ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
-            #         RandFlipd(keys=["image", "label"], spatial_axis=[0], prob=0.3),
-            #         RandFlipd(keys=["image", "label"], spatial_axis=[1], prob=0.3),
-            #         RandFlipd(keys=["image", "label"], spatial_axis=[2], prob=0.3),
-            #         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 1)),
-            #         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(1, 2)),
-            #         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 2)),
-            #         RandAdjustContrastd(keys=["image"], prob=0.8, gamma=(0.5, 2)),
-            #         OneOf([
-            #             RandGaussianSmoothd(keys=["image"], prob=0.1),
-            #             RandGaussianSharpend(keys=["image"], prob=0.1),
-            #         ]),
-            #         RandGibbsNoised(keys=["image"], prob=0.2),
-            #         RandScaleIntensityd(keys=["image"], factors=(1/1.1, 1.1), prob=1.0),
-            #         RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=1.0),
-            #         RandGaussianNoised(keys=["image"], prob=1.0, std=0.002),
-            #         EnsureTyped(keys=["image", "label"]),
-            #     ]
-            # )
+            train_transforms = Compose(
+                load_transforms + [
+                    RandCropByPosNegLabeld(
+                        keys=["image", "label"], label_key="label",
+                        spatial_size=crop_size, pos=Pos_ratio, neg=1,
+                        num_samples=N_crops, image_key="image", image_threshold=-1,
+                    ),
+                    ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
+                    RandFlipd(keys=["image", "label"], spatial_axis=[0], prob=0.3),
+                    RandFlipd(keys=["image", "label"], spatial_axis=[1], prob=0.3),
+                    RandFlipd(keys=["image", "label"], spatial_axis=[2], prob=0.3),
+                    RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 1)),
+                    RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(1, 2)),
+                    RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 2)),
+                    RandAdjustContrastd(keys=["image"], prob=0.8, gamma=(0.5, 2)),
+                    OneOf([
+                        RandGaussianSmoothd(keys=["image"], prob=0.1),
+                        RandGaussianSharpend(keys=["image"], prob=0.1),
+                    ]),
+                    RandGibbsNoised(keys=["image"], prob=0.2),
+                    RandScaleIntensityd(keys=["image"], factors=(1/1.1, 1.1), prob=1.0),
+                    RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=1.0),
+                    RandGaussianNoised(keys=["image"], prob=1.0, std=0.002),
+                    EnsureTyped(keys=["image", "label"]),
+                ]
+            )
             ## AA EXPERIMENT END
 
             ## AA EXPERIMENT 2: nnU-Net-matched augmentations (order matches nnUNet pipeline)
@@ -824,42 +824,42 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
             #   + RandomAffine    : continuous rotation ±30°, scale 0.7–1.4 (p=0.2)
             #   + SimulateLowRes  : nearest-exact downsample → trilinear upsample (p=0.25)
             #   + InvertedGamma   : γ=0.7–1.5 on inverted image (p=0.1)
-            train_transforms = Compose(
-                load_transforms + [
-                    RandCropByPosNegLabeld(
-                        keys=["image", "label"], label_key="label",
-                        spatial_size=crop_size, pos=Pos_ratio, neg=1,
-                        num_samples=N_crops, image_key="image", image_threshold=-1,
-                    ),
-                    ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
-                    # nnUNet addition: continuous spatial transform
-                    RandomAffine(include=["image", "label"], p=0.2,
-                                 degrees=(30, 30, 30),
-                                 scales=(0.7, 1.4),
-                                 default_pad_value='mean'),
-                    # pretrain-matched geometric
-                    RandFlipd(keys=["image", "label"], spatial_axis=[0], prob=0.3),
-                    RandFlipd(keys=["image", "label"], spatial_axis=[1], prob=0.3),
-                    RandFlipd(keys=["image", "label"], spatial_axis=[2], prob=0.3),
-                    RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 1)),
-                    RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(1, 2)),
-                    RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 2)),
-                    # pretrain-matched intensity (unchanged)
-                    RandAdjustContrastd(keys=["image"], prob=0.8, gamma=(0.5, 2)),
-                    OneOf([
-                        RandGaussianSmoothd(keys=["image"], prob=0.1),
-                        RandGaussianSharpend(keys=["image"], prob=0.1),
-                    ]),
-                    RandGibbsNoised(keys=["image"], prob=0.2),
-                    RandScaleIntensityd(keys=["image"], factors=(1/1.1, 1.1), prob=1.0),
-                    RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=1.0),
-                    RandGaussianNoised(keys=["image"], prob=1.0, std=0.002),
-                    # nnUNet additions: resolution degradation + inverted gamma
-                    SimulateLowResolutiond(keys=["image"], zoom_range=(0.5, 1.0), prob=0.25),
-                    RandInvertedGammad(keys=["image"], prob=0.1, gamma_range=(0.7, 1.5)),
-                    EnsureTyped(keys=["image", "label"]),
-                ]
-            )
+            # train_transforms = Compose(
+            #     load_transforms + [
+            #         RandCropByPosNegLabeld(
+            #             keys=["image", "label"], label_key="label",
+            #             spatial_size=crop_size, pos=Pos_ratio, neg=1,
+            #             num_samples=N_crops, image_key="image", image_threshold=-1,
+            #         ),
+            #         ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
+            #         # nnUNet addition: continuous spatial transform
+            #         RandomAffine(include=["image", "label"], p=0.2,
+            #                      degrees=(30, 30, 30),
+            #                      scales=(0.7, 1.4),
+            #                      default_pad_value='mean'),
+            #         # pretrain-matched geometric
+            #         RandFlipd(keys=["image", "label"], spatial_axis=[0], prob=0.3),
+            #         RandFlipd(keys=["image", "label"], spatial_axis=[1], prob=0.3),
+            #         RandFlipd(keys=["image", "label"], spatial_axis=[2], prob=0.3),
+            #         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 1)),
+            #         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(1, 2)),
+            #         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 2)),
+            #         # pretrain-matched intensity (unchanged)
+            #         RandAdjustContrastd(keys=["image"], prob=0.8, gamma=(0.5, 2)),
+            #         OneOf([
+            #             RandGaussianSmoothd(keys=["image"], prob=0.1),
+            #             RandGaussianSharpend(keys=["image"], prob=0.1),
+            #         ]),
+            #         RandGibbsNoised(keys=["image"], prob=0.2),
+            #         RandScaleIntensityd(keys=["image"], factors=(1/1.1, 1.1), prob=1.0),
+            #         RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=1.0),
+            #         RandGaussianNoised(keys=["image"], prob=1.0, std=0.002),
+            #         # nnUNet additions: resolution degradation + inverted gamma
+            #         SimulateLowResolutiond(keys=["image"], zoom_range=(0.5, 1.0), prob=0.25),
+            #         RandInvertedGammad(keys=["image"], prob=0.1, gamma_range=(0.7, 1.5)),
+            #         EnsureTyped(keys=["image", "label"]),
+            #     ]
+            # )
             ## AA EXPERIMENT 3 END
         else:
             # NIfTI mode: standard MONAI loading with tomogram-level intensity normalization
