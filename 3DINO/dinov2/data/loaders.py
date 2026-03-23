@@ -131,8 +131,8 @@ def make_segmentation_dataset_3d(
         if "10989" in dataset_name or "10010" in dataset_name:
             class_num = 2
         elif "12049" in dataset_name:
-            # class_num = 4  # classes 1 and 5 merged into bg → effective 4 classes (bg + 2,3,4)
-            class_num = 6  # original 6-class labels (remap disabled)
+            class_num = 4  # classes 1 and 5 merged into bg → effective 4 classes (bg + 2,3,4)
+            # class_num = 6  # original 6-class labels (remap disabled)
         else:
             class_num = 4
     ## AA CHANGES END   

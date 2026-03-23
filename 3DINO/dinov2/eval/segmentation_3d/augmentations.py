@@ -695,15 +695,15 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
             # Binary label merging for Dataset010 (all foreground classes → 1)
             if "10010" in dataset_name:
                 load_transforms.append(Lambdad(keys=["label"], func=lambda x: (x > 0).float()))
-            # Dataset049 (12049): merge classes 1,5 into bg; remap 2→1, 3→2, 4→3
-            # if "12049" in dataset_name:
-            #     def _remap_12049(x):
-            #         out = torch.zeros_like(x)
-            #         out[x == 2] = 1
-            #         out[x == 3] = 2
-            #         out[x == 4] = 3
-            #         return out.float()
-            #     load_transforms.append(Lambdad(keys=["label"], func=_remap_12049))
+            # Dataset049 (12049) merged: keep classes 0,2,3,4; merge 1,5 into bg; remap 2→1, 3→2, 4→3 → 4-class
+            if "12049" in dataset_name:
+                def _remap_12049(x):
+                    out = torch.zeros_like(x)
+                    out[x == 2] = 1
+                    out[x == 3] = 2
+                    out[x == 4] = 3
+                    return out.float()
+                load_transforms.append(Lambdad(keys=["label"], func=_remap_12049))
             # train_transforms = Compose(
             #     load_transforms + [
             #         RandCropByPosNegLabeld(
@@ -872,14 +872,14 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
             if "10010" in dataset_name:
                 nifti_load_transforms.append(Lambdad(keys=["label"], func=lambda x: (x > 0).float()))
             # Dataset049 (12049): merge classes 1,5 into bg; remap 2→1, 3→2, 4→3
-            # if "12049" in dataset_name:
-            #     def _remap_12049(x):
-            #         out = torch.zeros_like(x)
-            #         out[x == 2] = 1
-            #         out[x == 3] = 2
-            #         out[x == 4] = 3
-            #         return out.float()
-            #     nifti_load_transforms.append(Lambdad(keys=["label"], func=_remap_12049))
+            if "12049" in dataset_name:
+                def _remap_12049(x):
+                    out = torch.zeros_like(x)
+                    out[x == 2] = 1
+                    out[x == 3] = 2
+                    out[x == 4] = 3
+                    return out.float()
+                nifti_load_transforms.append(Lambdad(keys=["label"], func=_remap_12049))
             train_transforms = Compose(
                 nifti_load_transforms + [
                     ZScoreNormalized(keys=["image"]),
@@ -917,14 +917,14 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
         if "10010" in dataset_name:
             val_load_transforms.append(Lambdad(keys=["label"], func=lambda x: (x > 0).float()))
         # Dataset049 (12049): merge classes 1,5 into bg; remap 2→1, 3→2, 4→3
-        # if "12049" in dataset_name:
-        #     def _remap_12049(x):
-        #         out = torch.zeros_like(x)
-        #         out[x == 2] = 1
-        #         out[x == 3] = 2
-        #         out[x == 4] = 3
-        #         return out.float()
-        #     val_load_transforms.append(Lambdad(keys=["label"], func=_remap_12049))
+        if "12049" in dataset_name:
+            def _remap_12049(x):
+                out = torch.zeros_like(x)
+                out[x == 2] = 1
+                out[x == 3] = 2
+                out[x == 4] = 3
+                return out.float()
+            val_load_transforms.append(Lambdad(keys=["label"], func=_remap_12049))
         val_transforms = Compose(
             val_load_transforms + [
                 # ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
