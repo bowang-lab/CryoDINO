@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-patches-pretrain-aug-merged
+#SBATCH -J 3dino-ft-patches-ds-specific-aug
 #SBATCH -p gpu_bwanggroup
 #SBATCH -t 6-00:00:00
 #SBATCH --account=bwanggroup_gpu
@@ -92,36 +92,40 @@ OVERLAP=0.75
 
 # Inference parameters — dataset-specific
 declare -A DATALIST
-# DATALIST["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist.json"
-# DATALIST["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist.json"
-# DATALIST["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
+DATALIST["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist.json"
+DATALIST["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist.json"
+DATALIST["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
 DATALIST["Dataset049_EMPIAR_12049_transposed_patches512"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist.json"
 
 declare -A NUM_CLASSES
-# NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
-# NUM_CLASSES["Dataset010_CZII_10010_patches512"]=2
-# NUM_CLASSES["Dataset989_EMPIAR_10989_transposed_patches512"]=2
+NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
+NUM_CLASSES["Dataset010_CZII_10010_patches512"]=2
+NUM_CLASSES["Dataset989_EMPIAR_10989_transposed_patches512"]=2
 NUM_CLASSES["Dataset049_EMPIAR_12049_transposed_patches512"]=4
 
 declare -A INFER_DATASET_NAME
-# INFER_DATASET_NAME["Dataset001_CZII_10001_patches512"]="Dataset001_CZII_10001"
-# INFER_DATASET_NAME["Dataset010_CZII_10010_patches512"]="Dataset010_CZII_10010"
-# INFER_DATASET_NAME["Dataset989_EMPIAR_10989_transposed_patches512"]="Dataset989_EMPIAR_10989_transposed"
+INFER_DATASET_NAME["Dataset001_CZII_10001_patches512"]="Dataset001_CZII_10001"
+INFER_DATASET_NAME["Dataset010_CZII_10010_patches512"]="Dataset010_CZII_10010"
+INFER_DATASET_NAME["Dataset989_EMPIAR_10989_transposed_patches512"]="Dataset989_EMPIAR_10989_transposed"
 INFER_DATASET_NAME["Dataset049_EMPIAR_12049_transposed_patches512"]="Dataset049_EMPIAR_12049_transposed"
 
 mkdir -p "$BASE_OUTPUT_DIR"
 
 DATASETS=(
-    # "Dataset001_CZII_10001_patches512"
-    # "Dataset010_CZII_10010_patches512"
-    # "Dataset989_EMPIAR_10989_transposed_patches512"
+    "Dataset001_CZII_10001_patches512"
+    "Dataset010_CZII_10010_patches512"
+    "Dataset989_EMPIAR_10989_transposed_patches512"
     "Dataset049_EMPIAR_12049_transposed_patches512"
     )
 
 for DATASET_NAME in "${DATASETS[@]}"; do
 
-    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_pretrain_aug_merged"
-    CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_merged"
+    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_ds_specific_aug"
+    if [[ "$DATASET_NAME" == *"12049"* ]]; then
+        CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_merged"
+    else
+        CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
+    fi
 
     # Clean old cache and output
     # rm -rf "$CACHE_DIR"
@@ -154,7 +158,8 @@ for DATASET_NAME in "${DATASETS[@]}"; do
       --num-workers "$NUM_WORKERS" \
       --learning-rate "$LEARNING_RATE" \
       --cache-dir "$CACHE_DIR" \
-      --resize-scale "$RESIZE_SCALE"
+      --resize-scale "$RESIZE_SCALE" \
+      --deep-supervision
 
     echo "Finished training: $OUTPUT_DIR"
 

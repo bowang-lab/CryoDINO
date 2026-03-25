@@ -11,11 +11,12 @@ from .vit_adapter import ViTAdapter
 
 
 class UNETRHead(nn.Module):
-    def __init__(self, feature_model, input_channels, image_size, num_classes, autocast_ctx):
+    def __init__(self, feature_model, input_channels, image_size, num_classes, autocast_ctx, deep_supervision=False):
         super().__init__()
 
         self.autocast_ctx = autocast_ctx
         self.input_channels = input_channels
+        self.deep_supervision = deep_supervision
         self.feature_model = feature_model
         self.hidden_size = self.feature_model.num_features
         self.feature_size = 32
@@ -112,6 +113,12 @@ class UNETRHead(nn.Module):
             res_block=True,
         )
         self.out = UnetOutBlock(spatial_dims=3, in_channels=self.feature_size, out_channels=num_classes)
+
+        if deep_supervision:
+            self.out_ds1 = UnetOutBlock(spatial_dims=3, in_channels=self.feature_size*2, out_channels=num_classes)  # H/2
+            self.out_ds2 = UnetOutBlock(spatial_dims=3, in_channels=self.feature_size*4, out_channels=num_classes)  # H/4
+            self.out_ds3 = UnetOutBlock(spatial_dims=3, in_channels=self.feature_size*8, out_channels=num_classes)  # H/8
+
         self.proj_axes = (0, 3 + 1) + tuple(d + 1 for d in range(3))
         self.proj_view_shape = list(self.feat_size) + [self.hidden_size]
 
@@ -157,10 +164,13 @@ class UNETRHead(nn.Module):
         enc3 = self.encoder3(self.proj_feat(x3))
         enc4 = self.encoder4(self.proj_feat(x4))
         dec4 = self.proj_feat(x)
-        dec3 = self.decoder5(dec4, enc4)
-        dec2 = self.decoder4(dec3, enc3)
-        dec1 = self.decoder3(dec2, enc2)
-        out = self.decoder2(dec1, enc1)
+        dec3 = self.decoder5(dec4, enc4)  # H/8, 8F
+        dec2 = self.decoder4(dec3, enc3)  # H/4, 4F
+        dec1 = self.decoder3(dec2, enc2)  # H/2, 2F
+        out  = self.decoder2(dec1, enc1)  # H, F
+
+        if self.deep_supervision and self.training:
+            return [self.out(out), self.out_ds1(dec1), self.out_ds2(dec2), self.out_ds3(dec3)]
         return self.out(out)
 
 
@@ -224,11 +234,12 @@ class LinearDecoderHead(nn.Module):
 
 class ViTAdapterUNETRHead(nn.Module):
 
-    def __init__(self, feature_model, input_channels, image_size, num_classes, autocast_ctx):
+    def __init__(self, feature_model, input_channels, image_size, num_classes, autocast_ctx, deep_supervision=False):
         super().__init__()
 
         self.autocast_ctx = autocast_ctx
         self.input_channels = input_channels
+        self.deep_supervision = deep_supervision
         self.feature_model = ViTAdapter(feature_model, input_channels)
         self.hidden_size = self.feature_model.vit_model.num_features
         self.feature_size = 32
@@ -257,6 +268,11 @@ class ViTAdapterUNETRHead(nn.Module):
                                      kernel_size=3, upsample_kernel_size=2, norm_name='instance', res_block=True)
         self.out = UnetOutBlock(spatial_dims=3, in_channels=self.feature_size, out_channels=num_classes)
 
+        if deep_supervision:
+            self.out_ds1 = UnetOutBlock(spatial_dims=3, in_channels=self.feature_size,   out_channels=num_classes)  # H/2
+            self.out_ds2 = UnetOutBlock(spatial_dims=3, in_channels=self.feature_size*2, out_channels=num_classes)  # H/4
+            self.out_ds3 = UnetOutBlock(spatial_dims=3, in_channels=self.feature_size*4, out_channels=num_classes)  # H/8
+
     def forward(self, x_in):
 
         f1, f2, f3, f4 = self.feature_model(x_in)
@@ -269,5 +285,8 @@ class ViTAdapterUNETRHead(nn.Module):
         dec2 = self.decoder4(enc4, enc3)  # H/8, W/8, D/8, 4F
         dec1 = self.decoder3(dec2, enc2)  # H/4, W/4, D/4, 2F
         dec0 = self.decoder2(dec1, enc1)  # H/2, W/2, D/2, F
-        out = self.decoder1(dec0, enc0)  # H, W, D, F
+        out = self.decoder1(dec0, enc0)   # H, W, D, F
+
+        if self.deep_supervision and self.training:
+            return [self.out(out), self.out_ds1(dec0), self.out_ds2(dec1), self.out_ds3(dec2)]
         return self.out(out)  # H, W, D, num_classes
