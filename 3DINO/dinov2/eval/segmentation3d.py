@@ -187,7 +187,8 @@ def do_finetune(feature_model, autocast_dtype, args):
         args.dataset_name,
         args.image_size,
         args.resize_scale,
-        min_int=-1.0
+        min_int=-1.0,
+        train_feature_model=args.train_feature_model,
     )
     train_ds, val_ds, test_ds, input_channels, num_classes = make_segmentation_dataset_3d(
         args.dataset_name,

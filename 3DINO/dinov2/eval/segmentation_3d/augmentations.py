@@ -387,7 +387,7 @@ class SimulateLowResolutiond(MapTransform):
         return d
 
 
-def make_transforms(dataset_name, image_size, resize_scale, min_int):
+def make_transforms(dataset_name, image_size, resize_scale, min_int, train_feature_model=False):
 
     if dataset_name == 'BTCV':
         train_transforms = Compose(
@@ -687,6 +687,9 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int):
                 N_crops = 3
             else:
                 N_crops = 4
+            # Full fine-tuning (unfrozen backbone) uses more GPU memory — reduce crops by 1
+            if train_feature_model:
+                N_crops = max(1, N_crops - 1)
             # Patches are pre-extracted .pt files (zscore normalized), 4 crops of 112^3 per patch
             load_transforms = [
                 Lambdad(keys=["image"], func=lambda x: torch.load(x, map_location='cpu', weights_only=True).unsqueeze(0).float()),

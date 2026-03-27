@@ -193,7 +193,8 @@ for DATASET_NAME in "${DATASETS[@]}"; do
           --dataset-name "${INFER_DATASET_NAME[$DATASET_NAME]}" \
           --overlap "$OVERLAP" \
           --batch-size "$BATCH_SIZE" \
-          --cpu-metrics
+          --cpu-metrics \
+          --deep-supervision
 
         echo "Finished inference: $INFER_OUTPUT_DIR"
 
