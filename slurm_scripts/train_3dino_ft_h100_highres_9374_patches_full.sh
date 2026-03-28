@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-patches-ds-specific-aug-full-ft
+#SBATCH -J 3dino-ft-patches-ds-specific-aug-full-ft-lr1e-5
 #SBATCH -p gpu_bwanggroup
 #SBATCH -t 6-00:00:00
 #SBATCH --account=bwanggroup_gpu
@@ -44,7 +44,7 @@ WARMUP_ITERS=3000
 IMAGE_SIZE=112
 BATCH_SIZE=2
 NUM_WORKERS=10
-LEARNING_RATE=1e-4
+LEARNING_RATE=1e-5
 CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0
 OVERLAP=0.75
@@ -79,7 +79,7 @@ DATASETS=(
 
 for DATASET_NAME in "${DATASETS[@]}"; do
 
-    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_ds_specific_aug_full_ft"
+    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_ds_specific_aug_full_ft_lr1e-5"
     if [[ "$DATASET_NAME" == *"12049"* ]]; then
         CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_merged"
     else
