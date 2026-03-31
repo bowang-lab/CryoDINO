@@ -694,6 +694,8 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int, train_featu
             load_transforms = [
                 Lambdad(keys=["image"], func=lambda x: torch.load(x, map_location='cpu', weights_only=True).unsqueeze(0).float()),
                 Lambdad(keys=["label"], func=lambda x: torch.load(x, map_location='cpu', weights_only=True).unsqueeze(0).float()),
+                CropForegroundd(keys=["image", "label"], source_key="image", select_fn=lambda x: x != 0, allow_smaller=True),
+                SpatialPadd(keys=["image", "label"], spatial_size=(image_size, image_size, image_size), value=0),
             ]
             # Binary label merging for Dataset010 (all foreground classes → 1)
             if "10010" in dataset_name:

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-patches-ds-specific-aug
+#SBATCH -J 3dino-ft-patches-ds-specific-aug-mix
 #SBATCH -p gpu_bwanggroup
 #SBATCH -t 6-00:00:00
 #SBATCH --account=bwanggroup_gpu
@@ -67,6 +67,63 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
 
 # done
 
+# =========================
+# Augment patches for class balance (all datasets)
+# =========================
+BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+DATASETS_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream"
+
+declare -A AUG_INPUT_DATALISTS
+AUG_INPUT_DATALISTS["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist.json"
+AUG_INPUT_DATALISTS["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist.json"
+AUG_INPUT_DATALISTS["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
+AUG_INPUT_DATALISTS["Dataset049_EMPIAR_12049_transposed_patches512"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist.json"
+
+declare -A AUG_PATCH_OUTDIRS
+AUG_PATCH_OUTDIRS["Dataset001_CZII_10001_patches512"]="${DATASETS_DIR}/Dataset001_CZII_10001_train_patches_512_augmented"
+AUG_PATCH_OUTDIRS["Dataset010_CZII_10010_patches512"]="${DATASETS_DIR}/Dataset010_CZII_10010_train_patches_512_augmented"
+AUG_PATCH_OUTDIRS["Dataset989_EMPIAR_10989_transposed_patches512"]="${DATASETS_DIR}/Dataset989_EMPIAR_10989_transposed_train_patches_512_augmented"
+AUG_PATCH_OUTDIRS["Dataset049_EMPIAR_12049_transposed_patches512"]="${DATASETS_DIR}/Dataset049_EMPIAR_12049_transposed_train_patches_512_augmented"
+
+declare -A AUG_NUM_CLASSES
+AUG_NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
+AUG_NUM_CLASSES["Dataset010_CZII_10010_patches512"]=2
+AUG_NUM_CLASSES["Dataset989_EMPIAR_10989_transposed_patches512"]=2
+AUG_NUM_CLASSES["Dataset049_EMPIAR_12049_transposed_patches512"]=6
+
+AUG_DATASETS=(
+    "Dataset001_CZII_10001_patches512"
+    "Dataset010_CZII_10010_patches512"
+    "Dataset989_EMPIAR_10989_transposed_patches512"
+    "Dataset049_EMPIAR_12049_transposed_patches512"
+)
+
+for AUG_DS in "${AUG_DATASETS[@]}"; do
+    AUG_INPUT="${AUG_INPUT_DATALISTS[$AUG_DS]}"
+    AUG_OUTDIR="${AUG_PATCH_OUTDIRS[$AUG_DS]}"
+    AUG_CLS="${AUG_NUM_CLASSES[$AUG_DS]}"
+    AUG_JSON_NAME="$(basename "$AUG_INPUT" .json)_augmented.json"
+
+    echo "=============================================="
+    echo "Augmenting patches: $AUG_DS"
+    echo "=============================================="
+
+    # rm -rf "$AUG_OUTDIR"
+    mkdir -p "$AUG_OUTDIR"
+
+    python preprocessing/mix_patches_augmentation_cryodino.py \
+        --datalist "$AUG_INPUT" \
+        --output-dir "$AUG_OUTDIR" \
+        --num-classes "$AUG_CLS" \
+        --target-multiplier 3.0 \
+        --max-patches 1000 \
+        --seed 42
+
+    # Move augmented datalist JSON to BASE_DATA_DIR for consistency
+    mv "${AUG_OUTDIR}/${AUG_JSON_NAME}" "${BASE_DATA_DIR}/${AUG_JSON_NAME}"
+    echo "Moved augmented datalist → ${BASE_DATA_DIR}/${AUG_JSON_NAME}"
+done
+
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 # =========================
@@ -92,10 +149,16 @@ OVERLAP=0.75
 
 # Inference parameters — dataset-specific
 declare -A DATALIST
-DATALIST["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist.json"
-DATALIST["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist.json"
-DATALIST["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
-DATALIST["Dataset049_EMPIAR_12049_transposed_patches512"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist.json"
+# Original (no mix-patch augmentation):
+# DATALIST["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist.json"
+# DATALIST["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist.json"
+# DATALIST["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
+# DATALIST["Dataset049_EMPIAR_12049_transposed_patches512"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist.json"
+# Mix-patch augmented datalists (generated above, moved to BASE_DATA_DIR):
+DATALIST["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist_augmented.json"
+DATALIST["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist_augmented.json"
+DATALIST["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist_augmented.json"
+DATALIST["Dataset049_EMPIAR_12049_transposed_patches512"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist_augmented.json"
 
 declare -A NUM_CLASSES
 NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
@@ -120,7 +183,7 @@ DATASETS=(
 
 for DATASET_NAME in "${DATASETS[@]}"; do
 
-    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_ds_specific_aug"
+    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_ds_specific_aug_mix_patches"
     if [[ "$DATASET_NAME" == *"12049"* ]]; then
         CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_merged"
     else
@@ -158,8 +221,7 @@ for DATASET_NAME in "${DATASETS[@]}"; do
       --num-workers "$NUM_WORKERS" \
       --learning-rate "$LEARNING_RATE" \
       --cache-dir "$CACHE_DIR" \
-      --resize-scale "$RESIZE_SCALE" \
-      --deep-supervision
+      --resize-scale "$RESIZE_SCALE"
 
     echo "Finished training: $OUTPUT_DIR"
 
@@ -193,8 +255,7 @@ for DATASET_NAME in "${DATASETS[@]}"; do
           --dataset-name "${INFER_DATASET_NAME[$DATASET_NAME]}" \
           --overlap "$OVERLAP" \
           --batch-size "$BATCH_SIZE" \
-          --cpu-metrics \
-          --deep-supervision
+          --cpu-metrics
 
         echo "Finished inference: $INFER_OUTPUT_DIR"
 
