@@ -119,9 +119,10 @@ for AUG_DS in "${AUG_DATASETS[@]}"; do
         --max-patches 1000 \
         --seed 42
 
-    # Move augmented datalist JSON to BASE_DATA_DIR for consistency
-    mv "${AUG_OUTDIR}/${AUG_JSON_NAME}" "${BASE_DATA_DIR}/${AUG_JSON_NAME}"
-    echo "Moved augmented datalist → ${BASE_DATA_DIR}/${AUG_JSON_NAME}"
+    # Move augmented datalist JSON to BASE_DATA_DIR with name matching loaders.py convention:
+    # loaders.py constructs "{dataset_name}_100_datalist.json", so we use "{AUG_DS}_augmented_100_datalist.json"
+    mv "${AUG_OUTDIR}/${AUG_JSON_NAME}" "${BASE_DATA_DIR}/${AUG_DS}_augmented_100_datalist.json"
+    echo "Moved augmented datalist → ${BASE_DATA_DIR}/${AUG_DS}_augmented_100_datalist.json"
 done
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
@@ -154,32 +155,46 @@ declare -A DATALIST
 # DATALIST["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist.json"
 # DATALIST["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
 # DATALIST["Dataset049_EMPIAR_12049_transposed_patches512"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist.json"
-# Mix-patch augmented datalists (generated above, moved to BASE_DATA_DIR):
-DATALIST["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist_augmented.json"
-DATALIST["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist_augmented.json"
-DATALIST["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist_augmented.json"
-DATALIST["Dataset049_EMPIAR_12049_transposed_patches512"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist_augmented.json"
+# Mix-patch augmented (dataset_name has _augmented suffix → loaders.py finds "{name}_100_datalist.json"):
+DATALIST["Dataset001_CZII_10001_patches512_augmented"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_augmented_100_datalist.json"
+DATALIST["Dataset010_CZII_10010_patches512_augmented"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_augmented_100_datalist.json"
+DATALIST["Dataset989_EMPIAR_10989_transposed_patches512_augmented"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_augmented_100_datalist.json"
+DATALIST["Dataset049_EMPIAR_12049_transposed_patches512_augmented"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_augmented_100_datalist.json"
 
 declare -A NUM_CLASSES
-NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
-NUM_CLASSES["Dataset010_CZII_10010_patches512"]=2
-NUM_CLASSES["Dataset989_EMPIAR_10989_transposed_patches512"]=2
-NUM_CLASSES["Dataset049_EMPIAR_12049_transposed_patches512"]=4
+# NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
+# NUM_CLASSES["Dataset010_CZII_10010_patches512"]=2
+# NUM_CLASSES["Dataset989_EMPIAR_10989_transposed_patches512"]=2
+# NUM_CLASSES["Dataset049_EMPIAR_12049_transposed_patches512"]=4
+NUM_CLASSES["Dataset001_CZII_10001_patches512_augmented"]=4
+NUM_CLASSES["Dataset010_CZII_10010_patches512_augmented"]=2
+NUM_CLASSES["Dataset989_EMPIAR_10989_transposed_patches512_augmented"]=2
+NUM_CLASSES["Dataset049_EMPIAR_12049_transposed_patches512_augmented"]=4
 
 declare -A INFER_DATASET_NAME
-INFER_DATASET_NAME["Dataset001_CZII_10001_patches512"]="Dataset001_CZII_10001"
-INFER_DATASET_NAME["Dataset010_CZII_10010_patches512"]="Dataset010_CZII_10010"
-INFER_DATASET_NAME["Dataset989_EMPIAR_10989_transposed_patches512"]="Dataset989_EMPIAR_10989_transposed"
-INFER_DATASET_NAME["Dataset049_EMPIAR_12049_transposed_patches512"]="Dataset049_EMPIAR_12049_transposed"
+# INFER_DATASET_NAME["Dataset001_CZII_10001_patches512"]="Dataset001_CZII_10001"
+# INFER_DATASET_NAME["Dataset010_CZII_10010_patches512"]="Dataset010_CZII_10010"
+# INFER_DATASET_NAME["Dataset989_EMPIAR_10989_transposed_patches512"]="Dataset989_EMPIAR_10989_transposed"
+# INFER_DATASET_NAME["Dataset049_EMPIAR_12049_transposed_patches512"]="Dataset049_EMPIAR_12049_transposed"
+INFER_DATASET_NAME["Dataset001_CZII_10001_patches512_augmented"]="Dataset001_CZII_10001"
+INFER_DATASET_NAME["Dataset010_CZII_10010_patches512_augmented"]="Dataset010_CZII_10010"
+INFER_DATASET_NAME["Dataset989_EMPIAR_10989_transposed_patches512_augmented"]="Dataset989_EMPIAR_10989_transposed"
+INFER_DATASET_NAME["Dataset049_EMPIAR_12049_transposed_patches512_augmented"]="Dataset049_EMPIAR_12049_transposed"
 
 mkdir -p "$BASE_OUTPUT_DIR"
 
+# DATASETS=(
+#     "Dataset001_CZII_10001_patches512"
+#     "Dataset010_CZII_10010_patches512"
+#     "Dataset989_EMPIAR_10989_transposed_patches512"
+#     "Dataset049_EMPIAR_12049_transposed_patches512"
+# )
 DATASETS=(
-    "Dataset001_CZII_10001_patches512"
-    "Dataset010_CZII_10010_patches512"
-    "Dataset989_EMPIAR_10989_transposed_patches512"
-    "Dataset049_EMPIAR_12049_transposed_patches512"
-    )
+    "Dataset001_CZII_10001_patches512_augmented"
+    "Dataset010_CZII_10010_patches512_augmented"
+    "Dataset989_EMPIAR_10989_transposed_patches512_augmented"
+    "Dataset049_EMPIAR_12049_transposed_patches512_augmented"
+)
 
 for DATASET_NAME in "${DATASETS[@]}"; do
 
