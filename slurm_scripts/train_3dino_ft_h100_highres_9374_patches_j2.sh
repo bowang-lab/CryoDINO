@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-patches-ds-specific-aug-mix-j2
+#SBATCH -J 3dino-ft-patches-agg-aug-mix-j2
 #SBATCH -p gpu_bwanggroup
 #SBATCH -t 6-00:00:00
 #SBATCH --account=bwanggroup_gpu
@@ -44,7 +44,7 @@ echo "=============================================="
 echo "Augmenting: $AUG_DS"
 echo "=============================================="
 
-# rm -rf "$AUG_OUTDIR"
+rm -rf "$AUG_OUTDIR"
 mkdir -p "$AUG_OUTDIR"
 
 AUG_JSON_NAME="$(basename "$AUG_INPUT" .json)_augmented.json"
@@ -82,11 +82,10 @@ CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ca
 RESIZE_SCALE=1.0
 OVERLAP=0.75
 
-OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_ds_specific_aug_mix_patches"
+OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_agg_aug_mix_patches"
 CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
 
-# rm -rf "$CACHE_DIR"
-# rm -rf "$OUTPUT_DIR"
+rm -rf "$CACHE_DIR"
 mkdir -p "$CACHE_DIR"
 mkdir -p "$OUTPUT_DIR"
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-patches-ds-specific-aug-mix
+#SBATCH -J 3dino-ft-patches-agg-aug-mix
 #SBATCH -p gpu_bwanggroup
 #SBATCH -t 6-00:00:00
 #SBATCH --account=bwanggroup_gpu
@@ -91,6 +91,19 @@ AUG_NUM_CLASSES["Dataset010_CZII_10010_patches512"]=2
 AUG_NUM_CLASSES["Dataset989_EMPIAR_10989_transposed_patches512"]=2
 AUG_NUM_CLASSES["Dataset049_EMPIAR_12049_transposed_patches512"]=6
 
+# Per-dataset mix-patch settings
+declare -A AUG_MULTIPLIERS
+AUG_MULTIPLIERS["Dataset001_CZII_10001_patches512"]=2.0       # lower multiplier; empty-threshold raised (few canvases otherwise)
+AUG_MULTIPLIERS["Dataset010_CZII_10010_patches512"]=3.0
+AUG_MULTIPLIERS["Dataset989_EMPIAR_10989_transposed_patches512"]=20.0  # only 1 training tomo → saturate budget
+AUG_MULTIPLIERS["Dataset049_EMPIAR_12049_transposed_patches512"]=3.0
+
+declare -A AUG_EMPTY_THRESHOLDS
+AUG_EMPTY_THRESHOLDS["Dataset001_CZII_10001_patches512"]=0.15  # only 2 canvases at 0.02; raise to get more bg diversity
+AUG_EMPTY_THRESHOLDS["Dataset010_CZII_10010_patches512"]=0.02
+AUG_EMPTY_THRESHOLDS["Dataset989_EMPIAR_10989_transposed_patches512"]=0.02
+AUG_EMPTY_THRESHOLDS["Dataset049_EMPIAR_12049_transposed_patches512"]=0.02
+
 AUG_DATASETS=(
     "Dataset001_CZII_10001_patches512"
     "Dataset010_CZII_10010_patches512"
@@ -108,14 +121,15 @@ for AUG_DS in "${AUG_DATASETS[@]}"; do
     echo "Augmenting patches: $AUG_DS"
     echo "=============================================="
 
-    # rm -rf "$AUG_OUTDIR"
+    rm -rf "$AUG_OUTDIR"
     mkdir -p "$AUG_OUTDIR"
 
     python preprocessing/mix_patches_augmentation_cryodino.py \
         --datalist "$AUG_INPUT" \
         --output-dir "$AUG_OUTDIR" \
         --num-classes "$AUG_CLS" \
-        --target-multiplier 3.0 \
+        --target-multiplier "${AUG_MULTIPLIERS[$AUG_DS]}" \
+        --empty-threshold "${AUG_EMPTY_THRESHOLDS[$AUG_DS]}" \
         --max-patches 1000 \
         --seed 42
 
@@ -198,16 +212,14 @@ DATASETS=(
 
 for DATASET_NAME in "${DATASETS[@]}"; do
 
-    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_ds_specific_aug_mix_patches"
+    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_agg_aug_mix_patches"
     if [[ "$DATASET_NAME" == *"12049"* ]]; then
         CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_merged"
     else
         CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
     fi
 
-    # Clean old cache and output
-    # rm -rf "$CACHE_DIR"
-    # rm -rf "$OUTPUT_DIR"
+    rm -rf "$CACHE_DIR"
     mkdir -p "$CACHE_DIR"
     mkdir -p "$OUTPUT_DIR"
 
