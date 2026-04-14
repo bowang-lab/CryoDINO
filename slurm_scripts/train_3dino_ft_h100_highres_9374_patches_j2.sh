@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-patches-agg-aug-mix-j2
+#SBATCH -J 3dino-ft-ds-aug-mix-v2-j2
 #SBATCH -p gpu_bwanggroup
-#SBATCH -t 6-00:00:00
+#SBATCH -t 2-00:00:00
 #SBATCH --account=bwanggroup_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
@@ -44,21 +44,19 @@ echo "=============================================="
 echo "Augmenting: $AUG_DS"
 echo "=============================================="
 
-rm -rf "$AUG_OUTDIR"
-mkdir -p "$AUG_OUTDIR"
-
-AUG_JSON_NAME="$(basename "$AUG_INPUT" .json)_augmented.json"
-
-python preprocessing/mix_patches_augmentation_cryodino.py \
-    --datalist "$AUG_INPUT" \
-    --output-dir "$AUG_OUTDIR" \
-    --num-classes "$AUG_CLS" \
-    --target-multiplier 3.0 \
-    --max-patches 1000 \
-    --seed 42
-
-mv "${AUG_OUTDIR}/${AUG_JSON_NAME}" "${BASE_DATA_DIR}/${AUG_DS}_augmented_100_datalist.json"
-echo "Moved augmented datalist → ${BASE_DATA_DIR}/${AUG_DS}_augmented_100_datalist.json"
+# Reusing existing augmented patches from previous run (only online augmentations changed)
+# rm -rf "$AUG_OUTDIR"
+# mkdir -p "$AUG_OUTDIR"
+# AUG_JSON_NAME="$(basename "$AUG_INPUT" .json)_augmented.json"
+# python preprocessing/mix_patches_augmentation_cryodino.py \
+#     --datalist "$AUG_INPUT" \
+#     --output-dir "$AUG_OUTDIR" \
+#     --num-classes "$AUG_CLS" \
+#     --target-multiplier 3.0 \
+#     --max-patches 1000 \
+#     --seed 42
+# mv "${AUG_OUTDIR}/${AUG_JSON_NAME}" "${BASE_DATA_DIR}/${AUG_DS}_augmented_100_datalist.json"
+# echo "Moved augmented datalist → ${BASE_DATA_DIR}/${AUG_DS}_augmented_100_datalist.json"
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
@@ -82,10 +80,11 @@ CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ca
 RESIZE_SCALE=1.0
 OVERLAP=0.75
 
-OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_agg_aug_mix_patches"
+OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_ds_specific_aug_mix_patches_v2"
 CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
 
-rm -rf "$CACHE_DIR"
+# Reusing existing cache from previous run
+# rm -rf "$CACHE_DIR"
 mkdir -p "$CACHE_DIR"
 mkdir -p "$OUTPUT_DIR"
 
