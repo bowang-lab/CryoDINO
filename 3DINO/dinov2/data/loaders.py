@@ -191,7 +191,7 @@ def make_detection_dataset_3d(
 
     if dataset_name == 'byu':
         datalist_path = os.path.join(base_directory, f"{dataset_name}_100_datalist.json")
-        class_num = 2
+        class_num = 1       # AA: 1 class (motor); bg is implicit at bg_index=num_classes; was wrongly 2
         input_channels = 1
     elif dataset_name == 'czi':
         datalist_path = os.path.join(base_directory, f"{dataset_name}_100_datalist.json")

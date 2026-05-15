@@ -14,8 +14,8 @@
 #
 # Data dict format:
 #   "image"  : torch.Tensor [1, D, H, W]  (z-score normalised .pt patch, channel-first)
-#   "points" : np.ndarray [N, 5]          columns = (z, y, x, class_id, sigma_vox)
-#              padding rows use z = -100 as sentinel
+#   "points" : np.ndarray [N, 5]          columns = (x, y, z, class_id, sigma_vox)
+#              padding rows use class_id = -100 as sentinel
 
 import torch
 
@@ -47,11 +47,11 @@ class RandFlipWithPointsd(RandomizableTransform, MapTransform):
 
     Ported from Kaggle random_flip_volume — same logic, MONAI dict-transform wrapper.
 
-    Points columns: (z, y, x, class_id, sigma_vox)   [axis → column]
-       spatial_axis 0 → z → column 0
+    Points columns: (x, y, z, class_id, sigma_vox)   [axis → column]
+       spatial_axis 0 → x → column 0
        spatial_axis 1 → y → column 1
-       spatial_axis 2 → x → column 2
-    Rows with z < 0 are padding and passed through unchanged.
+       spatial_axis 2 → z → column 2
+    Rows with class_id < 0 (column 3) are padding and passed through unchanged.
 
     Args:
         image_key    : dict key for image [1, D, H, W]
@@ -83,7 +83,9 @@ class RandFlipWithPointsd(RandomizableTransform, MapTransform):
         d[self.image_key] = torch.flip(img, dims=[self.axis + 1])
 
         # Mirror coordinate: new_coord = (size - 1) - old_coord  [Kaggle convention]
-        valid = pts[:, 0] >= 0
+        # AA: old sentinel (ZYX: column 0 = z = -100 for padding):
+        # valid = pts[:, 0] >= 0
+        valid = pts[:, 3] >= 0   # XYZ: padding rows have class_id = -100 at column 3
         pts[valid, self.axis] = (size - 1) - pts[valid, self.axis]
         d[self.points_key] = pts
         return d
@@ -137,7 +139,9 @@ class RandRotate90WithPointsd(RandomizableTransform, MapTransform):
         d[self.image_key] = torch.rot90(img, k=self._k, dims=[a + 1, b + 1])
 
         # Update point coordinates
-        valid = pts[:, 0] >= 0
+        # AA: old sentinel (ZYX: column 0 = z = -100 for padding):
+        # valid = pts[:, 0] >= 0
+        valid = pts[:, 3] >= 0   # XYZ: padding rows have class_id = -100 at column 3
         old_a = pts[valid, a].copy()
         old_b = pts[valid, b].copy()
 
