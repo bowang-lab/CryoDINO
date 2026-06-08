@@ -1,5 +1,7 @@
 # output
 output/
+CLAUDE*
+.claude/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
