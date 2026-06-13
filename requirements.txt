@@ -1,6 +1,6 @@
 alabaster==0.7.16
 annotated-types==0.7.0
-antlr4-python3-runtime==4.9.3
+#antlr4-python3-runtime==4.9.3
 app-model==0.3.2
 appdirs==1.4.4
 asciitree==0.3.3
@@ -173,11 +173,11 @@ tifffile==2024.8.30
 tomli==2.4.0
 tomli_w==1.2.0
 toolz==1.1.0
-torch==2.1.0+cu121
-torchaudio==2.1.0+cu121
+#torch==2.1.0+cu121
+#torchaudio==2.1.0+cu121
 torchio==0.20.23
 torchmetrics==0.10.3
-torchvision==0.16.0+cu121
+#torchvision==0.16.0+cu121
 tornado==6.5.4
 tqdm==4.67.1
 traitlets==5.14.3
@@ -195,8 +195,10 @@ urllib3==2.6.2
 vispy==0.14.3
 wcwidth==0.6.0
 wrapt==2.0.1
-xformers==0.0.22.post4
+#xformers==0.0.22.post4
 yacs==0.1.8
 zarr==2.18.2
 zict==3.0.0
 zipp==3.23.0
+einops
+

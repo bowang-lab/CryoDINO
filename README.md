@@ -82,8 +82,30 @@ conda activate cryoet
 ```
 
 **Option B — pip into an existing Python 3.9 environment**
+ salloc -c 16 -t 10:0:0 --mem 240G --gres=gpu:1 --partition=gpu_bwanggroup --account=bwanggroup_gpu
+srun --jobid=6716412 --overlap --pty bash
+
+sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/bwanggroup/reza/
+projects/cryoet /home/sumin/uhn-data
+(t129616uhn@h4huhndata1.uhnresearch.ca) Password:
+sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/bwanggroup/reza/projects/cryoet /home/sumin/uhn-data
+sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/bwanggroup/reza/
+projects/cryoet /home/sumin/uhn-data
+(t129616uhn@h4huhndata1.uhnresearch.ca) Password:
+sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/bwanggroup/reza/
+projects/cryoet /home/sumin/uhn-data
 
 ```bash
+pip install --extra-index-url https://pypi.nvidia.com cuml-cu11
+pip install torch==2.1.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu121
+
+pip download antlr4-python3-runtime==4.9.3 --no-binary :all: --no-deps -d /tmp/antlr
+cd /tmp/antlr && tar xzf antlr4-python3-runtime-4.9.3.tar.gz && cd antlr4-python3-runtime-4.9.3
+mkdir -p bin && touch bin/pygrun
+pip install .
+
+pip install xformers==0.0.22.post7 --index-url https://download.pytorch.org/whl/cu121
 pip install -r requirements.txt
 ```
 
