@@ -54,17 +54,37 @@ def compute_metrics(reference_points, reference_radius, candidate_points):
 # CZI Detection Metrics  (6 particle classes, Kaggle CZII competition)
 # ---------------------------------------------------------------------------
 
+# Per-particle physical constants: (radius_Å, F-beta weight). Values are identical
+# to the official Kaggle CZII metric (see official_metrics_czii.py). Names use our
+# NIfTI/CSV spelling; the official spellings map as: ferritin complex=apo-ferritin,
+# cytosolic ribosome=ribosome, virus-like capsid=virus-like-particle.
+_CZI_PARTICLE_INFO = {
+    'Beta-amylase':       (65,  0),   # weight 0 → excluded from the aggregate score
+    'Beta-galactosidase': (90,  2),
+    'Thyroglobulin':      (130, 2),
+    'cytosolic ribosome': (150, 1),
+    'ferritin complex':   (60,  1),
+    'virus-like capsid':  (135, 1),
+}
+# Class IDs are assigned ALPHABETICALLY by particle name (Python sorted()). This MUST
+# match load_detection_annotations() in preprocessing/downstream_patch_generation.py,
+# which sorts the CSV particle names the same way to define the GT class IDs the model
+# is trained on — i.e. the model's output channel order. Deriving the order here via
+# sorted() (instead of a hand-written list) guarantees the two can never drift apart.
+_CZI_NAMES_SORTED = sorted(_CZI_PARTICLE_INFO)
+
+
 class CZIDetectionMetrics:
     """F4 metric for CZI 6-class particle detection.
 
     Particle radii and per-class weights are identical to Kaggle cryoet/metric.py.
 
-    Class IDs (0-indexed, matching our detection head output):
-        0  ferritin complex      radius=60 Å   weight=1
-        1  Beta-amylase          radius=65 Å   weight=0  (excluded from score)
-        2  Beta-galactosidase    radius=90 Å   weight=2
+    Class IDs (0-indexed, ALPHABETICAL — matching the detection head output channels):
+        0  Beta-amylase          radius=65 Å   weight=0  (excluded from score)
+        1  Beta-galactosidase    radius=90 Å   weight=2
+        2  Thyroglobulin         radius=130 Å  weight=2
         3  cytosolic ribosome    radius=150 Å  weight=1
-        4  Thyroglobulin         radius=130 Å  weight=2
+        4  ferritin complex      radius=60 Å   weight=1
         5  virus-like capsid     radius=135 Å  weight=1
 
     Usage:
@@ -76,10 +96,9 @@ class CZIDetectionMetrics:
         metric.reset()
     """
 
-    PARTICLE_NAMES     = ['ferritin complex', 'Beta-amylase', 'Beta-galactosidase',
-                          'cytosolic ribosome', 'Thyroglobulin', 'virus-like capsid']
-    PARTICLE_RADII_ANG = [60, 65, 90, 150, 130, 135]
-    WEIGHTS            = [1,  0,  2,  1,   2,   1]
+    PARTICLE_NAMES     = _CZI_NAMES_SORTED
+    PARTICLE_RADII_ANG = [_CZI_PARTICLE_INFO[n][0] for n in _CZI_NAMES_SORTED]
+    WEIGHTS            = [_CZI_PARTICLE_INFO[n][1] for n in _CZI_NAMES_SORTED]
 
     def __init__(self, distance_multiplier: float = 0.5, beta: int = 4):
         self.distance_multiplier = distance_multiplier

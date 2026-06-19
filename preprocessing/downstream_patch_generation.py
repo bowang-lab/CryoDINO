@@ -13,7 +13,7 @@ Detection mode (--detection --csv annotations.csv):
     XYZ coords (subtract patch offset), saves as "points" key.
     Val/test entries keep original NIfTI paths intact with global GT points.
 
-    CSV format: run, particle_name, z, y, x, voxel_size  (z/y/x in Angstroms)
+    CSV format: run, particle_name, z, y, x, voxel_size  (z/y/x in voxels)
     Coordinate convention (nibabel XYZ, matching pretraining):
       NIfTI axis 0 = X (~630 vox), axis 2 = Z (thin ~184 vox)
       Points stored as (x_vox, y_vox, z_vox, class_id, sigma_vox)
@@ -103,7 +103,7 @@ def run_name_from_nii(nii_path: str) -> str:
 def load_detection_annotations(csv_path: str, sigmas_ang: dict, default_sigma_ang: float) -> tuple:
     """Load point annotation CSV; return (annotations, class_map).
 
-    CSV format: run, particle_name, z, y, x, voxel_size  (z/y/x in Angstroms).
+    CSV format: run, particle_name, z, y, x, voxel_size  (z/y/x in voxels).
     Coordinate reorder — CSV (z, y, x) → stored as (x_vox, y_vox, z_vox),
     matching nibabel XYZ convention and augmentations.py points format.
 
@@ -135,15 +135,12 @@ def load_detection_annotations(csv_path: str, sigmas_ang: dict, default_sigma_an
     for row in rows:
         run      = row['run'].strip()
         particle = row['particle_name'].strip()
-        z_ang    = float(row['z'])
-        y_ang    = float(row['y'])
-        x_ang    = float(row['x'])
+        z_vox    = float(row['z'])
+        y_vox    = float(row['y'])
+        x_vox    = float(row['x'])
         vs       = float(row['voxel_size'])
 
-        # CSV (z, y, x) Angstroms → XYZ voxels (col 0=x, 1=y, 2=z)
-        x_vox     = x_ang / vs
-        y_vox     = y_ang / vs
-        z_vox     = z_ang / vs
+        # CSV (z, y, x) are already in voxels; reorder to XYZ (col 0=x, 1=y, 2=z)
         class_id  = float(class_map[particle])
         sigma_vox = sigmas_ang.get(particle, default_sigma_ang) / vs
 
