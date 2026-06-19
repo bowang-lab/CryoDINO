@@ -8,9 +8,9 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=220G
-#SBATCH --mail-user=sum.kim@mail.utoronto.ca
+#SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t129616uhn/projects/logs/%x_%j.log
+#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Fine-tuning: h100_high_res training_9374 — DETECTION (CZI)
@@ -38,7 +38,7 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t129616uhn/projects/CryoDINO/3DINO || exit 1
+cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 # =========================
 # Paths
@@ -51,8 +51,6 @@ CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/cache
 OUTPUT_JSON="${BASE_DATA_DIR}/czi_100_datalist.json"
 
 mkdir -p "$BASE_OUTPUT_DIR"
-
-#cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 # =========================
 # Fixed Parameters

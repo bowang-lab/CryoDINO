@@ -8,9 +8,9 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=220G
-#SBATCH --mail-user=sum.kim@mail.utoronto.ca
+#SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/projects/bwanggroup/sumin/logs/%x_%j.log
+#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Detection patch generation (CZI)
@@ -26,7 +26,7 @@ pwd
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t129616uhn/projects/CryoDINO || exit 1
+cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
 
 # =========================
 # Paths
