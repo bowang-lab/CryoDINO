@@ -1,16 +1,16 @@
 #!/bin/bash
 #SBATCH -J 3dino-ft-detection-czi
 #SBATCH -p gpu_bwanggroup
-#SBATCH -t 6-00:00:00
+#SBATCH -t 3-00:00:00
 #SBATCH --account=bwanggroup_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=220G
-#SBATCH --mail-user=attarpour1993@gmail.com
+#SBATCH --mail-user=sum.kim@mail.utoronto.ca
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/t129616uhn/projects/logs/%x_%j.log
 
 # =========================
 # Fine-tuning: h100_high_res training_9374 — DETECTION (CZI)
@@ -38,21 +38,21 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
+cd /cluster/home/t129616uhn/projects/CryoDINO/3DINO || exit 1
 
 # =========================
 # Paths
 # =========================
 BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection/Dataset440_CZII_10440_detection_patches_128"
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/finetuning_detection"
-CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream_detection"
+BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/finetuning_detection"
+CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/cache_dir_downstream_detection"
 
 # loaders.py make_detection_dataset_3d reads "{base-data-dir}/{dataset_name}_100_datalist.json"
 OUTPUT_JSON="${BASE_DATA_DIR}/czi_100_datalist.json"
 
 mkdir -p "$BASE_OUTPUT_DIR"
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+#cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 # =========================
 # Fixed Parameters
@@ -64,7 +64,7 @@ DATASET_PERCENT=100
 SEGMENTATION_HEAD="ViTAdapterUNETR"
 EPOCHS=100
 EPOCH_LENGTH=300
-EVAL_ITERS=600
+EVAL_ITERS=1500
 WARMUP_ITERS=3000
 IMAGE_SIZE=128                # must match PATCH_SIZE for detection
 BATCH_SIZE=4                  # 128^3 patches are smaller than seg 512^3

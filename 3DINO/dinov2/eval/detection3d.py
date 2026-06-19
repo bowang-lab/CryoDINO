@@ -406,8 +406,7 @@ def do_finetune(feature_model, autocast_dtype, args):
     elif args.segmentation_head == 'Linear':
         seg_model = LinearDecoderHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
     elif args.segmentation_head == 'ViTAdapterUNETR':
-        seg_model = ViTAdapterUNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx,
-                                        deep_supervision=args.deep_supervision)
+        seg_model = ViTAdapterUNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
     else:
         raise ValueError(f"Unknown segmentation head: {args.segmentation_head}")
 
@@ -511,7 +510,7 @@ def do_finetune(feature_model, autocast_dtype, args):
         if it % 100 == 0:
             print(f"[Iter {it}], Train loss: {train_loss}", flush=True)
 
-        if it % args.eval_iters == 0:
+        if it > 0 and it % args.eval_iters == 0:
             # AA: old segmentation val block:
             # total_val_dice = 0
             # total_per_cls_val_dice = [0 for _ in range(num_classes)]

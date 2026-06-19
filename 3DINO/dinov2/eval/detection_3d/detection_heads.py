@@ -312,7 +312,7 @@ class ViTAdapterUNETRHead(nn.Module):
             nn.Conv3d(_ch, _ch, kernel_size=3, padding=1), nn.SiLU(inplace=True), nn.InstanceNorm3d(_ch),
             nn.Conv3d(_ch, _ch, kernel_size=3, padding=1), nn.SiLU(inplace=True), nn.InstanceNorm3d(_ch),
         )
-        self.off_head = nn.Conv3d(_ch, 3, kernel_size=1)  # (Δz, Δy, Δx)
+        self.off_head = nn.Conv3d(_ch, 3, kernel_size=1)  # (Δx, Δy, Δz) — channel 0 = first axis (X), matches anchors_for_offsets_feature_map
         # AA: init: cls biased toward background; offsets start at zero
         nn.init.zeros_(self.cls_head.weight); nn.init.constant_(self.cls_head.bias, -4)
         nn.init.zeros_(self.off_head.weight); nn.init.zeros_(self.off_head.bias)

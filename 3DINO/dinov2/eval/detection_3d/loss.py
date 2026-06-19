@@ -182,13 +182,20 @@ class TaskAlignedAssigner(nn.Module):
 # ---------------------------------------------------------------------------
 
 def anchors_for_offsets_feature_map(offsets, stride):
-    z, y, x = torch.meshgrid(
+    # offsets spatial dims are (D, H, W) = volume axes (X, Y, Z). `a0` varies along
+    # the first spatial axis (X), `a2` along the last (Z).
+    a0, a1, a2 = torch.meshgrid(
         torch.arange(offsets.size(-3), device=offsets.device),
         torch.arange(offsets.size(-2), device=offsets.device),
         torch.arange(offsets.size(-1), device=offsets.device),
         indexing="ij",
     )
-    anchors = torch.stack([x, y, z], dim=0)
+    # Channel order must be (x, y, z) to match the GT label convention
+    # (load_detection_annotations stores [x, y, z]; col 0 = first volume axis = X).
+    # NOTE: the original Kaggle code used stack([x, y, z]) with x = last axis,
+    # which put channel 0 on Z — correct only for cube-shaped inputs. Fixed to
+    # stack([a0, a1, a2]) so channel 0 == first axis (X) for non-cubic volumes too.
+    anchors = torch.stack([a0, a1, a2], dim=0)
     anchors = anchors.float().add_(0.5).mul_(stride)
     anchors = anchors[None, ...].repeat(offsets.size(0), 1, 1, 1, 1)
     return anchors

@@ -17,6 +17,7 @@
 #   "points" : np.ndarray [N, 5]          columns = (x, y, z, class_id, sigma_vox)
 #              padding rows use class_id = -100 as sentinel
 
+import numpy as np
 import torch
 
 from monai.transforms import (
@@ -74,7 +75,7 @@ class RandFlipWithPointsd(RandomizableTransform, MapTransform):
             return d
 
         img = d[self.image_key]          # [1, D, H, W]
-        pts = d[self.points_key].copy()  # [N, 5], np.ndarray
+        pts = np.asarray(d[self.points_key]).copy()  # [N, 5] ndarray (handles MetaTensor/list)
 
         # Spatial size along this axis (dim 0 is channel → spatial dim = axis + 1)
         size = img.shape[self.axis + 1]
@@ -129,7 +130,7 @@ class RandRotate90WithPointsd(RandomizableTransform, MapTransform):
             return d
 
         img = d[self.image_key]          # [1, D, H, W]
-        pts = d[self.points_key].copy()  # [N, 5]
+        pts = np.asarray(d[self.points_key]).copy()  # [N, 5] ndarray (handles MetaTensor/list)
         a, b = self.a, self.b
 
         size_a = img.shape[a + 1]        # spatial sizes before rotation
@@ -161,6 +162,33 @@ class RandRotate90WithPointsd(RandomizableTransform, MapTransform):
 
 
 # ---------------------------------------------------------------------------
+# Image loader: branches on file type
+# ---------------------------------------------------------------------------
+
+def _load_detection_image(x):
+    """Load a detection image into a channel-first float tensor [1, D, H, W].
+
+    - .pt  → pre-extracted, z-score normalised training patch (load as-is).
+    - .nii / .nii.gz → raw val/test tomogram: load with nibabel (XYZ axis order,
+      matching patch generation) and z-score normalise so its intensity scale
+      matches the training .pt patches.
+    - already-loaded tensor/array → passed through unchanged.
+    """
+    if not isinstance(x, str):
+        return x
+
+    lower = x.lower()
+    if lower.endswith(".nii") or lower.endswith(".nii.gz"):
+        import nibabel as nib
+        vol = nib.load(x).get_fdata().astype(np.float32)        # (X, Y, Z)
+        mean, std = vol.mean(), vol.std()
+        vol = (vol - mean) / max(float(std), 1e-8)              # nnU-Net-style z-score
+        return torch.from_numpy(vol).unsqueeze(0).float()       # [1, X, Y, Z]
+
+    return torch.load(x, map_location="cpu", weights_only=True).unsqueeze(0).float()
+
+
+# ---------------------------------------------------------------------------
 # make_transforms — main entry point
 # ---------------------------------------------------------------------------
 
@@ -178,14 +206,15 @@ def make_transforms(crop_size: int = 96):  # noqa: ARG001
         (train_transforms, val_transforms) — both are monai.transforms.Compose objects
     """
     _load = [
-        # Load z-score normalised .pt patch → [1, D, H, W]
-        Lambdad(
-            keys=["image"],
-            func=lambda x: (
-                torch.load(x, map_location="cpu", weights_only=True).unsqueeze(0).float()
-                if isinstance(x, str) else x
-            ),
-        ),
+        # Load image → [1, D, H, W]. Training entries are pre-extracted, z-score
+        # normalised .pt patches; val/test entries are raw .nii.gz tomograms that
+        # must be loaded with nibabel and z-score normalised here (to match the
+        # normalisation baked into the training .pt patches).
+        Lambdad(keys=["image"], func=_load_detection_image),
+        # JSON datalist stores "points" as a list-of-lists; convert to an Nx5
+        # float32 ndarray so the geometric transforms (and collate) can index it.
+        # reshape(-1, 5) keeps the right shape even for patches with zero points.
+        Lambdad(keys=["points"], func=lambda p: np.asarray(p, dtype=np.float32).reshape(-1, 5)),
         # Per-crop percentile clip to [-1, 1] — matches pretraining ScaleIntensityRangePercentilesd
         ScaleIntensityRangePercentilesd(
             keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False
