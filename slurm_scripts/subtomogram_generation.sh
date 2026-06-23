@@ -20,12 +20,27 @@ conda activate cryoet
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/preprocessing
 
-python subtomograms_generation.py \
-  -i /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10442_imagesTr \
-  -o /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10442_imagesTr_subtomograms \
-  -m /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
+# python subtomograms_generation.py \
+#   -i /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10442_imagesTr \
+#   -o /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10442_imagesTr_subtomograms \
+#   -m /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
+
+# python subtomograms_generation.py \
+#   -i /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10443_imagesTr \
+#   -o /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10443_imagesTr_subtomograms \
+#   -m /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
+
+NEW_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/upload/nifti_unannotated_10476_10479_10493_06232026"
+SUBTOMO_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/subtomograms"
 
 python subtomograms_generation.py \
-  -i /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10443_imagesTr \
-  -o /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10443_imagesTr_subtomograms \
-  -m /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
+  -i "${NEW_BASE}/10476/imagesTr" \
+  -o "${SUBTOMO_BASE}/10476_subtomograms"
+
+python subtomograms_generation.py \
+  -i "${NEW_BASE}/10479/imagesTr" \
+  -o "${SUBTOMO_BASE}/10479_subtomograms"
+
+python subtomograms_generation.py \
+  -i "${NEW_BASE}/10493/imagesTr" \
+  -o "${SUBTOMO_BASE}/10493_subtomograms"
