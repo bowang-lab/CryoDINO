@@ -31,7 +31,7 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/preprocessing
 #   -m /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
 
 NEW_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/upload/nifti_unannotated_10476_10479_10493_06232026"
-SUBTOMO_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/subtomograms"
+SUBTOMO_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/nifti_unannotated_10476_10479_10493_06232026_subtomograms"
 
 python subtomograms_generation.py \
   -i "${NEW_BASE}/10476/imagesTr" \
