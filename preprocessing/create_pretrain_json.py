@@ -14,23 +14,31 @@ def parse_args():
                         help='Output JSON filename (default: pretrain_data.json)')
     return parser.parse_args()
 
+_nifti_cache = {}
+
 def get_nifti_metadata(subtomogram_path):
     """
-    Uses regex to convert the .pt path to the .nii.gz path and extracts spacing and shape.
+    Uses regex to convert the .pt path to the .nii.gz path and extracts spacing, mean, std.
+    Caches per tomogram so each NIfTI is loaded only once.
     """
     nifti_path = subtomogram_path.replace('_subtomograms', '')
-
-    # This regex replaces '_patch_', followed by anything, ending with '.pt' 
-    # with '.nii.gz'
     nifti_path = re.sub(r'_patch_.*\.pt$', '.nii.gz', nifti_path)
-    
+
+    if nifti_path in _nifti_cache:
+        return _nifti_cache[nifti_path]
+
     if not os.path.exists(nifti_path):
         print(f"Warning: NIfTI file not found for {subtomogram_path} at {nifti_path}")
         return None
 
     img = nib.load(nifti_path)
-    spacing = [float(s) for s in img.header.get_zooms()]    
-    return spacing
+    spacing = [float(s) for s in img.header.get_zooms()]
+    data = img.get_fdata()
+    tomo_mean = float(data.mean())
+    tomo_std = float(data.std())
+    result = (spacing, tomo_mean, tomo_std)
+    _nifti_cache[nifti_path] = result
+    return result
 
 def main():
     args = parse_args()
@@ -48,13 +56,16 @@ def main():
                 if file.endswith('.pt'):
                     full_path = os.path.join(root, file)
                     
-                    spacing = get_nifti_metadata(full_path)
-                    
-                    if spacing:
+                    meta = get_nifti_metadata(full_path)
+
+                    if meta:
+                        spacing, tomo_mean, tomo_std = meta
                         dataset.append({
                             "image": full_path,
                             "shape": [128, 128, 128],
-                            "spacing": spacing
+                            "spacing": spacing,
+                            "tomo_mean": tomo_mean,
+                            "tomo_std": tomo_std,
                         })
     
     # Save as a list of dictionaries
