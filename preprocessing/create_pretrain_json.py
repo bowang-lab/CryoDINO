@@ -4,6 +4,7 @@ import argparse
 import nibabel as nib
 import numpy as np
 import re
+from multiprocessing import Pool, cpu_count
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Create JSON file for pretraining from multiple folders.")
@@ -16,6 +17,8 @@ def parse_args():
     parser.add_argument('--update-existing', type=str, default=None, metavar='EXISTING_JSON',
                         help='Read patch paths from an existing JSON and add tomo_mean/tomo_std. '
                              'Skips directory walk entirely — much faster than re-scanning.')
+    parser.add_argument('--num-workers', type=int, default=None,
+                        help='Number of parallel workers for NIfTI loading (default: all CPUs).')
     return parser.parse_args()
 
 _nifti_cache = {}
@@ -42,24 +45,55 @@ def get_nifti_metadata(subtomogram_path):
     print(f"Loading: {nifti_path}")
     img = nib.load(nifti_path)
     spacing = [float(s) for s in img.header.get_zooms()]
-    data = np.asarray(img.dataobj, dtype=np.float32)
+    data = img.get_fdata(dtype=np.float32)
     tomo_mean = float(data.mean())
     tomo_std = float(data.std())
     result = (spacing, tomo_mean, tomo_std)
     _nifti_cache[nifti_path] = result
     return result
 
-def update_existing(existing_json, output_json):
+def _load_nifti_stats(nifti_path):
+    """Worker: load one NIfTI and return (nifti_path, spacing, mean, std) or None on failure."""
+    try:
+        img = nib.load(nifti_path)
+        spacing = [float(s) for s in img.header.get_zooms()]
+        data = img.get_fdata(dtype=np.float32)
+        print(f"Loaded: {nifti_path}", flush=True)
+        return (nifti_path, spacing, float(data.mean()), float(data.std()))
+    except Exception as e:
+        print(f"Warning: failed to load {nifti_path}: {e}", flush=True)
+        return None
+
+def update_existing(existing_json, output_json, num_workers=None):
     """Add tomo_mean/tomo_std to an existing pretrain JSON without re-walking directories."""
     with open(existing_json) as f:
         dataset = json.load(f)
     print(f"Loaded {len(dataset)} entries from {existing_json}")
 
+    # collect unique nifti paths
+    unique_niftis = sorted(set(
+        pt_path_to_nifti(entry['image'])
+        for entry in dataset
+    ))
+    print(f"Found {len(unique_niftis)} unique tomograms — loading in parallel...")
+
+    workers = num_workers or cpu_count()
+    with Pool(workers) as pool:
+        results = pool.map(_load_nifti_stats, unique_niftis)
+
+    stats_lookup = {}
+    for r in results:
+        if r is not None:
+            nifti_path, spacing, mean, std = r
+            stats_lookup[nifti_path] = (spacing, mean, std)
+
+    print(f"Successfully loaded {len(stats_lookup)}/{len(unique_niftis)} tomograms")
+
     updated, skipped = 0, 0
     for entry in dataset:
-        meta = get_nifti_metadata(entry['image'])
-        if meta:
-            _, tomo_mean, tomo_std = meta
+        nifti_path = pt_path_to_nifti(entry['image'])
+        if nifti_path in stats_lookup:
+            _, tomo_mean, tomo_std = stats_lookup[nifti_path]
             entry['tomo_mean'] = tomo_mean
             entry['tomo_std'] = tomo_std
             updated += 1
@@ -75,7 +109,7 @@ def main():
     args = parse_args()
 
     if args.update_existing:
-        update_existing(args.update_existing, args.output_json)
+        update_existing(args.update_existing, args.output_json, num_workers=args.num_workers)
         return
 
     if not args.input_folders:
