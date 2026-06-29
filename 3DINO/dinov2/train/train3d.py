@@ -9,8 +9,19 @@ import logging
 import math
 import os
 from functools import partial
-from monai.transforms import Compose, LoadImaged, ScaleIntensityRangePercentilesd, Lambdad, OneOf, ScaleIntensityd, MapTransform
 import random
+
+# PyTorch 2.6+ changed torch.load default to weights_only=True, which breaks
+# MONAI's PersistentDataset/CacheNTransDataset since cached files contain Python
+# objects (dicts, metadata) beyond plain tensors. Patch before MONAI is imported.
+import torch as _torch
+_orig_torch_load = _torch.load
+def _patched_torch_load(*args, **kwargs):
+    kwargs.setdefault('weights_only', False)
+    return _orig_torch_load(*args, **kwargs)
+_torch.load = _patched_torch_load
+
+from monai.transforms import Compose, LoadImaged, ScaleIntensityRangePercentilesd, Lambdad, OneOf, ScaleIntensityd, MapTransform
 
 from fvcore.common.checkpoint import PeriodicCheckpointer
 import torch

@@ -39,7 +39,7 @@ CACHE_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_d
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR_HIGH_REZ"
-mkdir -p "$CACHE_DIR"
+rm -rf "$CACHE_DIR" && mkdir -p "$CACHE_DIR"
 
 # =========================
 # Distributed Training Vars
