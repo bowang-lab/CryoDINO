@@ -1,21 +1,19 @@
 #!/bin/bash
 #SBATCH -J ssl-3dino-pretrain-high_res_b200
 #SBATCH -p gpu_pmcc_ai_team
-#SBATCH -t 2-00:00:00
+#SBATCH -t 7-00:00:00
 #SBATCH --account=pmcc_ai_team_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=62
+#SBATCH --cpus-per-task=120
 #SBATCH --mem=450G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
 
-# for a100 GPUs:
-# #SBATCH --cpus-per-task=120
-# #SBATCH --mem=6000G
-# nums of workers: 28
+# for a100 GPUs: --cpus-per-task=120, --mem=6000G, num_workers=28
+# for b200 GPUs: --cpus-per-task=120, --mem=450G, num_workers=28
 
 
 date
@@ -31,7 +29,7 @@ conda activate cryodino
 # =========================
 # Paths
 # =========================
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
+cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 CONFIG_FILE="dinov2/configs/ssl3d_default_config.yaml"
 CONFIG_FILE_HIGH_RES="dinov2/configs/train/vit3d_highres.yaml"
@@ -63,8 +61,7 @@ echo "Config: $CONFIG_FILE"
 echo "Output dir: $OUTPUT_DIR"
 echo "Cache dir: $CACHE_DIR"
 
-# PYTHONPATH=. \
-python -m torch.distributed.launch \
+PYTHONPATH=. python -m torch.distributed.launch \
   --nproc_per_node=${NUM_GPUS} \
   --master_port=${MASTER_PORT} \
   dinov2/train/train3d.py \
@@ -73,7 +70,7 @@ python -m torch.distributed.launch \
   --cache-dir "${CACHE_DIR}"
 echo "Pretraining job finished"
 
-python -m torch.distributed.launch \
+PYTHONPATH=. python -m torch.distributed.launch \
   --nproc_per_node=${NUM_GPUS} \
   --master_port=${MASTER_PORT} \
   dinov2/train/train3d.py \
