@@ -26,7 +26,7 @@ nvidia-smi
 # Environment
 # =========================
 source ~/.bashrc
-conda activate cryoet
+conda activate cryodino
 
 # =========================
 # Paths
@@ -73,15 +73,14 @@ python -m torch.distributed.launch \
   --cache-dir "${CACHE_DIR}"
 echo "Pretraining job finished"
 
-# PYTHONPATH=. \
-# python -m torch.distributed.launch \
-#   --nproc_per_node=${NUM_GPUS} \
-#   --master_port=${MASTER_PORT} \
-#   dinov2/train/train3d.py \
-#   --config-file "${CONFIG_FILE_HIGH_RES}" \
-#   --output-dir "${OUTPUT_DIR_HIGH_REZ}" \
-#   --cache-dir "${CACHE_DIR}"
-# echo "High-resolution pretraining job finished"
+python -m torch.distributed.launch \
+  --nproc_per_node=${NUM_GPUS} \
+  --master_port=${MASTER_PORT} \
+  dinov2/train/train3d.py \
+  --config-file "${CONFIG_FILE_HIGH_RES}" \
+  --output-dir "${OUTPUT_DIR_HIGH_REZ}" \
+  --cache-dir "${CACHE_DIR}"
+echo "High-resolution pretraining job finished"
 
 date
 
