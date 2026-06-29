@@ -1,5 +1,5 @@
 train:
-  batch_size_per_gpu: 144
+  batch_size_per_gpu: 208
   data_min_axis_size: 48
   OFFICIAL_EPOCH_LENGTH: 125
 student:
