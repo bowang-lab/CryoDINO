@@ -6,8 +6,8 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=64
-#SBATCH --mem=500G
+#SBATCH --cpus-per-task=120
+#SBATCH --mem=800G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
@@ -39,7 +39,7 @@ CACHE_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_d
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR_HIGH_REZ"
-rm -rf "$CACHE_DIR" && mkdir -p "$CACHE_DIR"
+mkdir -p "$CACHE_DIR"
 
 # =========================
 # Distributed Training Vars
