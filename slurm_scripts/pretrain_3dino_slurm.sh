@@ -67,7 +67,7 @@ PYTHONPATH=. python -m torch.distributed.launch \
   dinov2/train/train3d.py \
   --config-file "${CONFIG_FILE}" \
   --output-dir "${OUTPUT_DIR}" \
-  --cache-dir "${CACHE_DIR}"
+  --cache-dir "${CACHE_DIR}" || exit 1
 echo "Pretraining job finished"
 
 PYTHONPATH=. python -m torch.distributed.launch \
