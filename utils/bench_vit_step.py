@@ -23,7 +23,7 @@ N_ITERS = 10
 # batch 275/GPU: 2 global crops 96^3, 8 local crops 48^3.
 # Reduced here to fit a single GPU without FSDP sharding headroom concerns:
 # scale measured time by (275 / BATCH).
-BATCH = 64
+BATCH = 275
 
 
 def main():
@@ -31,6 +31,8 @@ def main():
     parser.add_argument("--profile", action="store_true", help="print top CUDA ops")
     parser.add_argument("--compile", action="store_true", help="torch.compile the model")
     parser.add_argument("--batch", type=int, default=BATCH)
+    parser.add_argument("--stages", action="store_true",
+                        help="time patch-embed vs blocks separately (low memory)")
     args = parser.parse_args()
 
     print(f"GPU: {torch.cuda.get_device_name(0)} | torch {torch.__version__}")
@@ -40,18 +42,45 @@ def main():
                          drop_path_rate=0.3, init_values=1e-5,
                          drop_path_uniform=True).cuda().half()
 
-    if args.compile:
-        model = torch.compile(model)
-        print("torch.compile enabled (first iters include compilation)")
-
     g = torch.randn(2 * args.batch, 1, 96, 96, 96, device="cuda", dtype=torch.half)
     l = torch.randn(8 * args.batch, 1, 48, 48, 48, device="cuda", dtype=torch.half)
 
+    def fwd(g_, l_):
+        return model.forward_features_list([g_, l_], [None, None])
+
+    if args.compile:
+        # compile the callable we actually invoke — torch.compile(model) would
+        # be bypassed because forward_features_list is called directly
+        fwd = torch.compile(fwd)
+        print("torch.compile enabled (first iters include compilation)")
+
     def step():
-        out = model.forward_features_list([g, l], [None, None])
+        out = fwd(g, l)
         loss = sum(o["x_norm_clstoken"].float().pow(2).mean() for o in out)
         loss.backward()
         model.zero_grad(set_to_none=True)
+
+    if args.stages:
+        def timeit(fn, *a):
+            for _ in range(3):
+                out = fn(*a)
+            torch.cuda.synchronize()
+            s, e = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+            s.record()
+            for _ in range(10):
+                fn(*a)
+            e.record()
+            torch.cuda.synchronize()
+            return s.elapsed_time(e) / 10, out
+
+        with torch.no_grad():
+            for label, inp in (("globals", g), ("locals ", l)):
+                ms_prep, tokens = timeit(lambda t: model.prepare_tokens_with_masks(t, None), inp)
+                ms_chunk, _ = timeit(lambda t: model.blocks[0](t), tokens)
+                print(f"{label}: prepare_tokens (conv3d patch embed + pos): {ms_prep:8.1f} ms")
+                print(f"{label}: one BlockChunk fwd (6 blocks, x4 total):   {ms_chunk:8.1f} ms")
+                print(f"{label}: est. full forward: {ms_prep + 4 * ms_chunk:8.1f} ms")
+        return
 
     for _ in range(N_WARMUP):
         step()
