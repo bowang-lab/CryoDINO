@@ -1,0 +1,74 @@
+"""Single-GPU forward+backward benchmark of the CryoDINO ViT-Large backbone.
+
+Isolates raw compute from FSDP/NCCL/dataloader: if this is fast, the training
+slowdown comes from distributed communication or dispatch; if slow, from
+kernels. Uses the same crop shapes as pretraining (batch 275/GPU).
+
+Run from the 3DINO directory on a GPU node:
+    cd 3DINO && PYTHONPATH=. python ../utils/bench_vit_step.py
+Optionally with profiler output:
+    PYTHONPATH=. python ../utils/bench_vit_step.py --profile
+"""
+
+import argparse
+import time
+
+import torch
+
+from dinov2.models.vision_transformer import vit_large_3d
+
+N_WARMUP = 3
+N_ITERS = 10
+
+# batch 275/GPU: 2 global crops 96^3, 8 local crops 48^3.
+# Reduced here to fit a single GPU without FSDP sharding headroom concerns:
+# scale measured time by (275 / BATCH).
+BATCH = 64
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--profile", action="store_true", help="print top CUDA ops")
+    parser.add_argument("--batch", type=int, default=BATCH)
+    args = parser.parse_args()
+
+    print(f"GPU: {torch.cuda.get_device_name(0)} | torch {torch.__version__}")
+    print(f"batch: {args.batch} (training uses 275; scale time by {275/args.batch:.2f}x)")
+
+    model = vit_large_3d(img_size=96, patch_size=16, block_chunks=4,
+                         drop_path_rate=0.3, layerscale=1e-5,
+                         drop_path_uniform=True).cuda().half()
+
+    g = torch.randn(2 * args.batch, 1, 96, 96, 96, device="cuda", dtype=torch.half)
+    l = torch.randn(8 * args.batch, 1, 48, 48, 48, device="cuda", dtype=torch.half)
+
+    def step():
+        out = model.forward_features_list([g, l], [None, None])
+        loss = sum(o["x_norm_clstoken"].float().pow(2).mean() for o in out)
+        loss.backward()
+        model.zero_grad(set_to_none=True)
+
+    for _ in range(N_WARMUP):
+        step()
+    torch.cuda.synchronize()
+
+    t0 = time.time()
+    for _ in range(N_ITERS):
+        step()
+    torch.cuda.synchronize()
+    per_iter = (time.time() - t0) / N_ITERS
+    scaled = per_iter * 275 / args.batch
+    print(f"\nfwd+bwd per iter (batch {args.batch}): {per_iter:.3f} s")
+    print(f"scaled to batch 275:                  {scaled:.3f} s")
+    print("(training does ~3 backbone passes/iter: student global+local, teacher global)")
+
+    if args.profile:
+        from torch.profiler import profile, ProfilerActivity
+        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+            step()
+            torch.cuda.synchronize()
+        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=25))
+
+
+if __name__ == "__main__":
+    main()
