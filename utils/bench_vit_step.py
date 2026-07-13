@@ -17,6 +17,11 @@ import torch
 
 from dinov2.models.vision_transformer import vit_large_3d
 
+import os
+if os.environ.get("CUDNN_BENCHMARK") == "1":
+    torch.backends.cudnn.benchmark = True
+    print(">>> torch.backends.cudnn.benchmark = True")
+
 N_WARMUP = 3
 N_ITERS = 10
 
