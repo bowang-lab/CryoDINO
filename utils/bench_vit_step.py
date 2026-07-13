@@ -29,6 +29,7 @@ BATCH = 64
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile", action="store_true", help="print top CUDA ops")
+    parser.add_argument("--compile", action="store_true", help="torch.compile the model")
     parser.add_argument("--batch", type=int, default=BATCH)
     args = parser.parse_args()
 
@@ -38,6 +39,10 @@ def main():
     model = vit_large_3d(img_size=96, patch_size=16, block_chunks=4,
                          drop_path_rate=0.3, init_values=1e-5,
                          drop_path_uniform=True).cuda().half()
+
+    if args.compile:
+        model = torch.compile(model)
+        print("torch.compile enabled (first iters include compilation)")
 
     g = torch.randn(2 * args.batch, 1, 96, 96, 96, device="cuda", dtype=torch.half)
     l = torch.randn(8 * args.batch, 1, 48, 48, 48, device="cuda", dtype=torch.half)
