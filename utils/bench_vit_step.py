@@ -36,7 +36,7 @@ def main():
     print(f"batch: {args.batch} (training uses 275; scale time by {275/args.batch:.2f}x)")
 
     model = vit_large_3d(img_size=96, patch_size=16, block_chunks=4,
-                         drop_path_rate=0.3, layerscale=1e-5,
+                         drop_path_rate=0.3, init_values=1e-5,
                          drop_path_uniform=True).cuda().half()
 
     g = torch.randn(2 * args.batch, 1, 96, 96, 96, device="cuda", dtype=torch.half)
