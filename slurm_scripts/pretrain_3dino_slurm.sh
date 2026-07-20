@@ -35,10 +35,12 @@ CONFIG_FILE="dinov2/configs/ssl3d_default_config.yaml"
 CONFIG_FILE_HIGH_RES="dinov2/configs/train/vit3d_highres.yaml"
 OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_b200"
 OUTPUT_DIR_HIGH_REZ="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res"
+OUTPUT_DIR_HIGH_REZ_128="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res_128"
 CACHE_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir"
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR_HIGH_REZ"
+mkdir -p "$OUTPUT_DIR_HIGH_REZ_128"
 mkdir -p "$CACHE_DIR"
 
 # =========================
@@ -61,23 +63,35 @@ echo "Config: $CONFIG_FILE"
 echo "Output dir: $OUTPUT_DIR"
 echo "Cache dir: $CACHE_DIR"
 
-PYTHONPATH=. python -m torch.distributed.launch \
-  --nproc_per_node=${NUM_GPUS} \
-  --master_port=${MASTER_PORT} \
-  dinov2/train/train3d.py \
-  --config-file "${CONFIG_FILE}" \
-  --output-dir "${OUTPUT_DIR}" \
-  --cache-dir "${CACHE_DIR}" || exit 1
-echo "Pretraining job finished"
+# --- Stage 1: SSL pretraining (96^3) — DONE, commented out ---
+# PYTHONPATH=. python -m torch.distributed.launch \
+#   --nproc_per_node=${NUM_GPUS} \
+#   --master_port=${MASTER_PORT} \
+#   dinov2/train/train3d.py \
+#   --config-file "${CONFIG_FILE}" \
+#   --output-dir "${OUTPUT_DIR}" \
+#   --cache-dir "${CACHE_DIR}" || exit 1
+# echo "Pretraining job finished"
 
+# --- Stage 2: high-res adaptation (112^3) — DONE, commented out ---
+# PYTHONPATH=. python -m torch.distributed.launch \
+#   --nproc_per_node=${NUM_GPUS} \
+#   --master_port=${MASTER_PORT} \
+#   dinov2/train/train3d.py \
+#   --config-file "${CONFIG_FILE_HIGH_RES}" \
+#   --output-dir "${OUTPUT_DIR_HIGH_REZ}" \
+#   --cache-dir "${CACHE_DIR}"
+# echo "High-resolution pretraining job finished"
+
+# --- Stage 2b: high-res adaptation (128^3, batch 130) ---
 PYTHONPATH=. python -m torch.distributed.launch \
   --nproc_per_node=${NUM_GPUS} \
   --master_port=${MASTER_PORT} \
   dinov2/train/train3d.py \
   --config-file "${CONFIG_FILE_HIGH_RES}" \
-  --output-dir "${OUTPUT_DIR_HIGH_REZ}" \
+  --output-dir "${OUTPUT_DIR_HIGH_REZ_128}" \
   --cache-dir "${CACHE_DIR}"
-echo "High-resolution pretraining job finished"
+echo "High-resolution (128) adaptation job finished"
 
 date
 
