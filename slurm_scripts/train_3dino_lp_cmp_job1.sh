@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 3dino-lp-cmp-job1-h100pre
+#SBATCH -J cryodino_3dino-lp-cmp-job1-h100pre
 #SBATCH -p gpu_pmcc_ai_team
 #SBATCH -t 7-00:00:00
 #SBATCH --account=pmcc_ai_team_gpu
