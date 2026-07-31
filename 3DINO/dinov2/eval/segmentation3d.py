@@ -3,6 +3,18 @@
 # This code is licensed under the CC BY-NC-ND 4.0 license
 # found in the LICENSE file in the root directory of this source tree.
 
+# PyTorch 2.6+ changed torch.load default to weights_only=True, which breaks
+# MONAI's PersistentDataset/CacheNTransDataset since cached files contain
+# MetaTensor/dict pickles (not bare tensors). Patch before MONAI is imported
+# (same fix as train3d.py). setdefault preserves any explicit weights_only=True
+# callers (e.g. the raw-patch Lambdad load in loaders.py).
+import torch as _torch
+_orig_torch_load = _torch.load
+def _patched_torch_load(*args, **kwargs):
+    kwargs.setdefault('weights_only', False)
+    return _orig_torch_load(*args, **kwargs)
+_torch.load = _patched_torch_load
+
 from dinov2.data.loaders import make_segmentation_dataset_3d
 from dinov2.data import SamplerType, make_data_loader
 from dinov2.eval.segmentation_3d.segmentation_heads import UNETRHead, LinearDecoderHead, ViTAdapterUNETRHead
