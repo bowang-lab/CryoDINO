@@ -36,19 +36,22 @@ conda activate cryodino
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
-CONFIG_DEFAULT="dinov2/configs/ssl3d_default_config.yaml"
-CONFIG_HIGHRES="dinov2/configs/train/vit3d_highres.yaml"
+CONFIG_DEFAULT="dinov2/configs/ssl3d_default_config.yaml"       # global_crops_size 96
+CONFIG_HIGHRES_112="dinov2/configs/train/vit3d_highres_112.yaml" # global_crops_size 112
+CONFIG_HIGHRES="dinov2/configs/train/vit3d_highres.yaml"        # global_crops_size 128
 EXP="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
 
 # Runs:  label | run_dir (glob eval/training_*/teacher_checkpoint.pth) | config | image_size
+# Config's global_crops_size must match the checkpoint's pretraining resolution
+# (it sets pos_embed size); image_size is the crop actually fed downstream.
 # random_init has no run_dir (handled specially: single run, empty weights).
 RUNS=(
     "h100_pretrain|${EXP}/ssl3d_run_h100|${CONFIG_DEFAULT}|96"
-    "h100_highres|${EXP}/ssl3d_run_h100_high_res|${CONFIG_HIGHRES}|112"
+    "h100_highres|${EXP}/ssl3d_run_h100_high_res|${CONFIG_HIGHRES_112}|112"
     "b200_pretrain|${EXP}/ssl3d_run_b200|${CONFIG_DEFAULT}|96"
-    "b200_highres112|${EXP}/ssl3d_run_b200_high_res|${CONFIG_HIGHRES}|112"
+    "b200_highres112|${EXP}/ssl3d_run_b200_high_res|${CONFIG_HIGHRES_112}|112"
     "b200_highres128|${EXP}/ssl3d_run_b200_high_res_128|${CONFIG_HIGHRES}|128"
-    "random_init|RANDOM|${CONFIG_HIGHRES}|112"
+    "random_init|RANDOM|${CONFIG_HIGHRES_112}|112"
 )
 
 downstream_datasets=(
