@@ -41,17 +41,18 @@ CONFIG_HIGHRES_112="dinov2/configs/train/vit3d_highres_112.yaml" # global_crops_
 CONFIG_HIGHRES="dinov2/configs/train/vit3d_highres.yaml"        # global_crops_size 128
 EXP="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
 
-# Runs:  label | run_dir (glob eval/training_*/teacher_checkpoint.pth) | config | image_size
+# Runs:  label | run_dir | config | image_size | ckpt_iter (optional)
+# ckpt_iter: if set, use ONLY eval/training_<iter>/teacher_checkpoint.pth; if empty,
+#   sweep ALL eval checkpoints. B200-ONLY for now — H100 (pinned to its known best,
+#   training_9374) will be run separately afterward, not in this sweep.
 # Config's global_crops_size must match the checkpoint's pretraining resolution
 # (it sets pos_embed size); image_size is the crop actually fed downstream.
 # random_init has no run_dir (handled specially: single run, empty weights).
 RUNS=(
-    "h100_pretrain|${EXP}/ssl3d_run_h100|${CONFIG_DEFAULT}|96"
-    "h100_highres|${EXP}/ssl3d_run_h100_high_res|${CONFIG_HIGHRES_112}|112"
-    "b200_pretrain|${EXP}/ssl3d_run_b200|${CONFIG_DEFAULT}|96"
-    "b200_highres112|${EXP}/ssl3d_run_b200_high_res|${CONFIG_HIGHRES_112}|112"
-    "b200_highres128|${EXP}/ssl3d_run_b200_high_res_128|${CONFIG_HIGHRES}|128"
-    "random_init|RANDOM|${CONFIG_HIGHRES_112}|112"
+    "b200_pretrain|${EXP}/ssl3d_run_b200|${CONFIG_DEFAULT}|96|"
+    "b200_highres112|${EXP}/ssl3d_run_b200_high_res|${CONFIG_HIGHRES_112}|112|"
+    "b200_highres128|${EXP}/ssl3d_run_b200_high_res_128|${CONFIG_HIGHRES}|128|"
+    "random_init|RANDOM|${CONFIG_HIGHRES_112}|112|"
 )
 
 downstream_datasets=(
@@ -146,7 +147,7 @@ run_one() {
 }
 
 for R in "${RUNS[@]}"; do
-    IFS='|' read -r LABEL RUN_DIR CONFIG_FILE IMAGE_SIZE <<< "$R"
+    IFS='|' read -r LABEL RUN_DIR CONFIG_FILE IMAGE_SIZE CKPT_ITER <<< "$R"
     selected "$LABEL" || { echo "Skipping $LABEL (not in selection)"; continue; }
 
     if [ "$RUN_DIR" == "RANDOM" ]; then
@@ -156,10 +157,14 @@ for R in "${RUNS[@]}"; do
         continue
     fi
 
-    # discover every eval checkpoint for this run (sorted by iteration)
-    CKPTS=( $(ls -1 "${RUN_DIR}"/eval/training_*/teacher_checkpoint.pth 2>/dev/null | sort -t_ -k2 -n) )
-    if [ ${#CKPTS[@]} -eq 0 ]; then
-        echo "  [WARN] no checkpoints found under ${RUN_DIR}/eval/ — skipping $LABEL"
+    # pinned single checkpoint (H100 best) or full sweep of eval checkpoints
+    if [ -n "$CKPT_ITER" ]; then
+        CKPTS=( "${RUN_DIR}/eval/training_${CKPT_ITER}/teacher_checkpoint.pth" )
+    else
+        CKPTS=( $(ls -1 "${RUN_DIR}"/eval/training_*/teacher_checkpoint.pth 2>/dev/null | sort -t_ -k2 -n) )
+    fi
+    if [ ${#CKPTS[@]} -eq 0 ] || [ ! -f "${CKPTS[0]}" ]; then
+        echo "  [WARN] no checkpoints found for $LABEL under ${RUN_DIR}/eval/ — skipping"
         continue
     fi
     echo ">>> $LABEL: ${#CKPTS[@]} checkpoints found"
