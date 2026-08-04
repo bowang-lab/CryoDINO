@@ -61,6 +61,13 @@ downstream_datasets=(
     "Dataset049_EMPIAR_12049_transposed_patches512"
 )
 
+# Optional dataset filter via LP_DATASETS env (space-separated). Running one job
+# per dataset means no two jobs ever touch the same cache dir -> eliminates the
+# shared-cache DataLoader deadlock. Unset = all datasets.
+if [ -n "$LP_DATASETS" ]; then
+    downstream_datasets=($LP_DATASETS)
+fi
+
 # Optional job-splitting: restrict to labels passed as args (default = all)
 SELECT=("$@")
 selected() {
@@ -101,7 +108,9 @@ run_one() {
     fi
     local RUN_LOG="${RUN_LOG_DIR}/${LABEL}_${TAG}_${DATASET_NAME}.log"
 
-    if [ -f "${OUTPUT_DIR}/results.json" ]; then
+    # Skip only if the run fully finished: results.json (written last, after test)
+    # AND best_model.pth both present. A partial run (one but not the other) reruns.
+    if [ -f "${OUTPUT_DIR}/results.json" ] && [ -f "${OUTPUT_DIR}/best_model.pth" ]; then
         echo "  [SKIP done] ${LABEL}/${TAG}/${DATASET_NAME}"
         return 0
     fi
