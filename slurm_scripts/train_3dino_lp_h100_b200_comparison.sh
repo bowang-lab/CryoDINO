@@ -141,8 +141,13 @@ run_one() {
       --num-workers "$NUM_WORKERS" \
       --learning-rate "$LEARNING_RATE" \
       --cache-dir "$CACHE_DIR" \
-      --resize-scale "$RESIZE_SCALE" 2>&1 | tee "$RUN_LOG" \
-      || { echo "  [FAILED] ${LABEL}/${TAG}/${DATASET_NAME} — continuing"; return 0; }
+      --resize-scale "$RESIZE_SCALE" 2>&1 | tee "$RUN_LOG"
+    # PIPESTATUS[0] = python's exit code; `|| ...` after a pipe only sees tee's
+    # (near-always 0), which silently mislabeled crashed runs as "Finished".
+    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+        echo "  [FAILED] ${LABEL}/${TAG}/${DATASET_NAME} — continuing"
+        return 0
+    fi
     echo "Finished: $OUTPUT_DIR"
 }
 
