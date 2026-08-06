@@ -15,11 +15,12 @@
 # =========================
 # H100 linear probing, pinned to its KNOWN BEST checkpoint (training_9374, the
 # 112^3 high-res Dice peak) across ALL 4 downstream datasets.
-# Uses its OWN cache namespace (lp_h100best_*) — NOT the shared
-# ssl3d_run_h100_high_res_training_9374_* dirs the concurrently-running B200
-# per-dataset jobs (ds001/ds010/ds989/ds049) are actively reading/writing right
-# now. Sharing would risk the exact cross-job cache deadlock already hit twice
-# on Dataset001. One-time cache rebuild cost, zero contention risk.
+# Shares the SAME per-dataset cache as the B200 sweep (ssl3d_run_h100_high_res_
+# training_9374_*) — safe now that Dataset010/989/049 are fully done (no other
+# job touching those caches). Only Dataset001 still has one B200 job re-running
+# a single leftover backbone (random_init) on that dataset's cache, so Dataset001
+# is deliberately LAST in the loop below — by the time we reach it, that job
+# should be long finished, avoiding the cross-job cache race hit earlier.
 # Results land in the SAME linear_probing_h100_b200_comparison dir for unified
 # plotting later.
 # =========================
@@ -38,11 +39,13 @@ IMAGE_SIZE=112
 TAG="training_9374"
 LABEL="h100_highres"
 
+# Dataset001 LAST on purpose — see note above (avoids racing the ds001 job's
+# leftover run on the shared Dataset001 cache).
 downstream_datasets=(
-    "Dataset001_CZII_10001_patches512"
     "Dataset010_CZII_10010_patches512"
     "Dataset989_EMPIAR_10989_transposed_patches512"
     "Dataset049_EMPIAR_12049_transposed_patches512"
+    "Dataset001_CZII_10001_patches512"
 )
 
 # =========================
@@ -71,9 +74,8 @@ fi
 
 for DATASET_NAME in "${downstream_datasets[@]}"; do
     OUTPUT_DIR="${BASE_OUTPUT_DIR}/${LABEL}_${TAG}_${DATASET_NAME}"
-    # Own cache namespace — isolated from the shared per-dataset caches the
-    # concurrently-running B200 jobs are using.
-    CACHE_DIR="${CACHE_DIR_BASE}/lp_h100best_${DATASET_NAME}"
+    # Shared cache with the B200 sweep (see note above on ordering/safety).
+    CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
     if [[ "$DATASET_NAME" == *"12049"* ]]; then
         CACHE_DIR="${CACHE_DIR}_merged"
     fi
