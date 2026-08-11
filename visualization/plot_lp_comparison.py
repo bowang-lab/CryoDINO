@@ -102,6 +102,20 @@ def write_csv(rows, out_path):
     print(f"Saved CSV: {out_path} ({len(rows)} rows)")
 
 
+# Cumulative offset: high-res adaptation runs AFTER pretraining finishes, so its
+# checkpoint iterations (0-based within that stage) must be shifted onto one
+# continuous training timeline instead of overlaid on pretrain's own 0-124999
+# range. highres112 and highres128 are TWO SEPARATE adaptation experiments that
+# both branch off the SAME final pretrain checkpoint (training_112499) — they
+# are parallel alternatives, not sequential — so they share the same offset.
+PRETRAIN_TOTAL_ITERS = 125000       # b200_pretrain: 0-124999
+OFFSET = {
+    "b200_pretrain": 0,
+    "b200_highres112": PRETRAIN_TOTAL_ITERS,
+    "b200_highres128": PRETRAIN_TOTAL_ITERS,
+}
+
+
 def plot_dataset(rows, ds, out_path, dpi=300):
     plt.rcParams.update({
         "font.family": "sans-serif",
@@ -110,12 +124,13 @@ def plot_dataset(rows, ds, out_path, dpi=300):
         "axes.titlesize": 12, "legend.fontsize": 9,
         "xtick.labelsize": 9, "ytick.labelsize": 9, "figure.dpi": 150,
     })
-    fig, ax = plt.subplots(figsize=(9, 6))
+    fig, ax = plt.subplots(figsize=(11, 6))
 
     ds_rows = [r for r in rows if r["dataset"] == ds]
     for family in ("b200_pretrain", "b200_highres112", "b200_highres128"):
         pts = sorted(
-            [(r["iteration"], r["test_dice"]) for r in ds_rows if r["family"] == family and r["test_dice"] is not None]
+            [(r["iteration"] + OFFSET[family], r["test_dice"])
+             for r in ds_rows if r["family"] == family and r["test_dice"] is not None]
         )
         if not pts:
             continue
@@ -133,7 +148,13 @@ def plot_dataset(rows, ds, out_path, dpi=300):
         ax.axhline(rand, color="gray", linestyle=":", linewidth=1.5,
                     label=f"Random init: {rand:.3f}")
 
-    ax.set_xlabel("Pretraining iteration", fontweight="medium")
+    ymax = ax.get_ylim()[1]
+    ax.axvline(PRETRAIN_TOTAL_ITERS, color="dimgray", linestyle=":", linewidth=1.2)
+    ax.text(PRETRAIN_TOTAL_ITERS, ymax * 0.99, " High-res adaptation starts (112³ & 128³ branch here)",
+             ha="left", va="top", fontsize=8, color="dimgray")
+
+    ax.set_xlabel("Cumulative training iteration (pretrain, then high-res 112³/128³ branching off it)",
+                   fontweight="medium")
     ax.set_ylabel("Test Dice (linear probe)", fontweight="medium")
     ax.set_title(f"Linear Probing — {DATASET_SHORT.get(ds, ds)}", fontweight="bold", pad=10)
     ax.legend(loc="best", frameon=True, fancybox=False, edgecolor="gray", framealpha=0.95)
