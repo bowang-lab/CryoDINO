@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=220G
+#SBATCH --mem=400G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
@@ -49,7 +49,7 @@ EVAL_ITERS=600
 WARMUP_ITERS=3000
 IMAGE_SIZE=112
 BATCH_SIZE=2
-NUM_WORKERS=16
+NUM_WORKERS=8
 LEARNING_RATE=1e-4
 CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0

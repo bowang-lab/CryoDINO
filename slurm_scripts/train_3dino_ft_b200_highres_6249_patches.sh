@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=220G
+#SBATCH --mem=400G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
@@ -85,6 +85,15 @@ for DATASET_NAME in "${DATASETS[@]}"; do
         CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
     fi
 
+    # Dataset001 has a documented chronic OOM (leak-like, worse with more
+    # workers/iterations — see linear-probing project memory); use 8 workers
+    # for it specifically, 16 for the others.
+    if [[ "$DATASET_NAME" == *"10001"* ]]; then
+        DS_NUM_WORKERS=8
+    else
+        DS_NUM_WORKERS="$NUM_WORKERS"
+    fi
+
     mkdir -p "$CACHE_DIR"
     mkdir -p "$OUTPUT_DIR"
 
@@ -110,7 +119,7 @@ for DATASET_NAME in "${DATASETS[@]}"; do
       --warmup-iters "$WARMUP_ITERS" \
       --image-size "$IMAGE_SIZE" \
       --batch-size "$BATCH_SIZE" \
-      --num-workers "$NUM_WORKERS" \
+      --num-workers "$DS_NUM_WORKERS" \
       --learning-rate "$LEARNING_RATE" \
       --cache-dir "$CACHE_DIR" \
       --resize-scale "$RESIZE_SCALE"

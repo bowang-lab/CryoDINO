@@ -275,7 +275,8 @@ class ViTAdapterUNETRHead(nn.Module):
 
     def forward(self, x_in):
 
-        f1, f2, f3, f4 = self.feature_model(x_in)
+        with self.autocast_ctx():
+            f1, f2, f3, f4 = self.feature_model(x_in)
         enc0 = self.encoder1(x_in)  # H, W, D, F
         enc1 = self.encoder2(f1)  # H/2, W/2, D/2, F
         enc2 = self.encoder3(f2)  # H/4, W/4, D/4, 2F
