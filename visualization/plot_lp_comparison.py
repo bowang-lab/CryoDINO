@@ -148,15 +148,13 @@ def plot_dataset(rows, ds, out_path, dpi=300):
         ax.axhline(rand, color="gray", linestyle=":", linewidth=1.5,
                     label=f"Random init: {rand:.3f}")
 
-    ymax = ax.get_ylim()[1]
     ax.axvline(PRETRAIN_TOTAL_ITERS, color="dimgray", linestyle=":", linewidth=1.2)
-    ax.text(PRETRAIN_TOTAL_ITERS, ymax * 0.99, " High-res adaptation starts (112³ & 128³ branch here)",
-             ha="left", va="top", fontsize=8, color="dimgray")
 
     ax.set_xlabel("Cumulative training iteration (pretrain, then high-res 112³/128³ branching off it)",
                    fontweight="medium")
     ax.set_ylabel("Test Dice (linear probe)", fontweight="medium")
-    ax.set_title(f"Linear Probing — {DATASET_SHORT.get(ds, ds)}", fontweight="bold", pad=10)
+    title = "Average over all 4 datasets" if ds == "AVERAGE" else DATASET_SHORT.get(ds, ds)
+    ax.set_title(f"Linear Probing — {title}", fontweight="bold", pad=10)
     ax.legend(loc="best", frameon=True, fancybox=False, edgecolor="gray", framealpha=0.95)
     ax.grid(True, linestyle="--", alpha=0.3, linewidth=0.5)
     ax.spines["top"].set_visible(False)
@@ -165,6 +163,26 @@ def plot_dataset(rows, ds, out_path, dpi=300):
     plt.savefig(out_path, dpi=dpi, bbox_inches="tight", facecolor="white", edgecolor="none")
     plt.close()
     print(f"Saved plot: {out_path}")
+
+
+def average_across_datasets(rows):
+    """Mean test_dice per (family, iteration) across all datasets that have a
+    value for it — used to pick the single best checkpoint/backbone overall,
+    since ds989's near-zero collapse otherwise skews a naive sum."""
+    groups = {}
+    for r in rows:
+        if r["test_dice"] is None:
+            continue
+        key = (r["family"], r["iteration"])
+        groups.setdefault(key, []).append(r["test_dice"])
+    avg_rows = []
+    for (family, it), vals in groups.items():
+        avg_rows.append({
+            "family": family, "iteration": it, "dataset": "AVERAGE",
+            "test_dice": sum(vals) / len(vals), "test_per_cls_dice": None,
+            "n_datasets": len(vals),
+        })
+    return avg_rows
 
 
 def main():
@@ -182,6 +200,19 @@ def main():
     for ds in DATASETS:
         out_path = os.path.join(args.out_dir, f"lp_comparison_{DATASET_SHORT.get(ds, ds)}.jpg")
         plot_dataset(rows, ds, out_path)
+
+    avg_rows = average_across_datasets(rows)
+    incomplete = [r for r in avg_rows if r["n_datasets"] < len(DATASETS)]
+    if incomplete:
+        print(f"WARNING: {len(incomplete)} (family, iteration) points are averaged over "
+              f"fewer than {len(DATASETS)} datasets — best-checkpoint pick may be skewed:")
+        for r in incomplete:
+            print(f"  {r['family']} / iter {r['iteration']}: n={r['n_datasets']}")
+    plot_dataset(rows + avg_rows, "AVERAGE", os.path.join(args.out_dir, "lp_comparison_AVERAGE.jpg"))
+
+    best = max((r for r in avg_rows if r["family"] != "random_init"), key=lambda r: r["test_dice"])
+    print(f"\nBest overall (mean across {len(DATASETS)} datasets): "
+          f"{best['family']} @ iter {best['iteration']} -> mean test_dice = {best['test_dice']:.4f}")
 
 
 if __name__ == "__main__":
