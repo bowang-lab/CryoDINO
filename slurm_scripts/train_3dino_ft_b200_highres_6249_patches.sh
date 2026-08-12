@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=400G
+#SBATCH --mem=700G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
@@ -89,7 +89,7 @@ for DATASET_NAME in "${DATASETS[@]}"; do
     # workers/iterations — see linear-probing project memory); use 8 workers
     # for it specifically, 16 for the others.
     if [[ "$DATASET_NAME" == *"10001"* ]]; then
-        DS_NUM_WORKERS=8
+        DS_NUM_WORKERS=4
     else
         DS_NUM_WORKERS="$NUM_WORKERS"
     fi
