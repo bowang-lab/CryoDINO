@@ -86,7 +86,8 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python di
   --num-workers "$NUM_WORKERS" \
   --learning-rate "$LEARNING_RATE" \
   --cache-dir "$CACHE_DIR" \
-  --resize-scale "$RESIZE_SCALE"
+  --resize-scale "$RESIZE_SCALE" \
+  --deep-supervision
 
 echo "Finished training: $OUTPUT_DIR"
 
@@ -114,7 +115,8 @@ else
       --dataset-name "$INFER_DS_NAME" \
       --overlap "$OVERLAP" \
       --batch-size "$BATCH_SIZE" \
-      --cpu-metrics
+      --cpu-metrics \
+      --deep-supervision
 
     echo "Finished inference: $INFER_OUTPUT_DIR"
 

@@ -790,7 +790,7 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int, train_featu
                     spatial_size=crop_size, pos=Pos_ratio, neg=1,
                     num_samples=N_crops, image_key="image", image_threshold=-1,
                 ),
-                ScaleIntensityRangePercentilesd(keys=["image"], lower=0.05, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
+                ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False),
             ]
             _pretrain_matched = [
                 RandFlipd(keys=["image", "label"], spatial_axis=[0], prob=0.3),

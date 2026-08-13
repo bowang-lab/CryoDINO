@@ -122,7 +122,8 @@ for DATASET_NAME in "${DATASETS[@]}"; do
       --num-workers "$DS_NUM_WORKERS" \
       --learning-rate "$LEARNING_RATE" \
       --cache-dir "$CACHE_DIR" \
-      --resize-scale "$RESIZE_SCALE"
+      --resize-scale "$RESIZE_SCALE" \
+      --deep-supervision
 
     echo "Finished training: $OUTPUT_DIR"
 
@@ -156,7 +157,8 @@ for DATASET_NAME in "${DATASETS[@]}"; do
           --dataset-name "${INFER_DATASET_NAME[$DATASET_NAME]}" \
           --overlap "$OVERLAP" \
           --batch-size "$BATCH_SIZE" \
-          --cpu-metrics
+          --cpu-metrics \
+          --deep-supervision
 
         echo "Finished inference: $INFER_OUTPUT_DIR"
 
