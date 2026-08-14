@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J cryodino-baseline
-#SBATCH -p gpu_bwanggroup
+#SBATCH -p gpu_pmcc_ai_team
 #SBATCH -t 6-00:00:00
-#SBATCH --account=bwanggroup_gpu
+#SBATCH --account=pmcc_ai_team_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -25,7 +25,7 @@ pwd
 nvidia-smi
 
 source ~/.bashrc
-conda activate cryoet
+conda activate cryodino
 
 BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
 CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
