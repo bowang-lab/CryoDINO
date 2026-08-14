@@ -44,12 +44,12 @@ declare -A NUM_CLASSES
 NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
 NUM_CLASSES["Dataset010_CZII_10010_patches512"]=2
 NUM_CLASSES["Dataset989_EMPIAR_10989_transposed_patches512"]=2
-NUM_CLASSES["Dataset049_EMPIAR_12049_transposed_patches512"]=6
+NUM_CLASSES["Dataset049_EMPIAR_12049_transposed_patches512"]=4
 
 DATASETS=(
-    "Dataset001_CZII_10001_patches512"
-    "Dataset010_CZII_10010_patches512"
-    "Dataset989_EMPIAR_10989_transposed_patches512"
+    # "Dataset001_CZII_10001_patches512"
+    # "Dataset010_CZII_10010_patches512"
+    # "Dataset989_EMPIAR_10989_transposed_patches512"
     "Dataset049_EMPIAR_12049_transposed_patches512"
 )
 MODELS=("unet" "unetr")
@@ -60,6 +60,9 @@ for MODEL in "${MODELS[@]}"; do
     for DATASET_NAME in "${DATASETS[@]}"; do
 
         CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
+        if [[ "$DATASET_NAME" == *"12049"* ]]; then
+            CACHE_DIR="${CACHE_DIR}_merged"
+        fi
         OUTPUT_DIR="${OUTPUT_BASE}/${MODEL}_${DATASET_NAME}"
 
         mkdir -p "$OUTPUT_DIR"
