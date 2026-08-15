@@ -171,7 +171,7 @@ def make_patchwise_predictor(model):
     matching per-patch percentile normalization used during pretraining."""
     from monai.transforms import ScaleIntensityRangePercentiles
     normalize = ScaleIntensityRangePercentiles(
-        lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False
+        lower=0.05, upper=99.95, b_min=-1, b_max=1, clip=True, relative=False
     )
 
     def predictor(patch_data):
