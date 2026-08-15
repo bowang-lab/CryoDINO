@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J cryodino_3dino-ft-b200-6249-j3
+#SBATCH -J cryodino_3dino-ft-b200-128-6249-j3
 #SBATCH -p gpu_pmcc_ai_team
 #SBATCH -t 2-00:00:00
 #SBATCH --account=pmcc_ai_team_gpu
@@ -14,11 +14,11 @@
 
 # =========================
 # Dataset989_EMPIAR_10989_transposed — fine-tuning with ViTAdapterUNETR head.
-# Backbone: B200 ssl3d_run_b200_high_res / training_6249 — the best overall LP
-# checkpoint from the linear_probing_h100_b200_comparison sweep. NOTE: this
-# dataset's LP scores collapsed to near-zero foreground Dice across almost
-# every backbone (including random init) — worth watching whether ViTAdapter-
-# UNETR (a stronger head) breaks that collapse or not.
+# Backbone: B200 ssl3d_run_b200_high_res_128 / training_6249 (128^3 adaptation,
+# second-best overall checkpoint from the linear_probing_h100_b200_comparison
+# sweep, after b200_highres112/training_6249). NOTE: this dataset's LP scores
+# collapsed to near-zero foreground Dice across almost every backbone
+# (including random init) for both highres112 and highres128.
 # Plain (non mix-patch-augmented) dataset, matching the LP sweep's inputs
 # exactly for a direct comparison — no mix_patches_augmentation_cryodino.py.
 # =========================
@@ -41,8 +41,8 @@ INFER_DS_NAME="Dataset989_EMPIAR_10989_transposed"
 # =========================
 # Fixed training parameters
 # =========================
-CONFIG_FILE="dinov2/configs/train/vit3d_highres_112.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res/eval/training_6249/teacher_checkpoint.pth"
+CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
+PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res_128/eval/training_6249/teacher_checkpoint.pth"
 BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/finetuning"
 DATASET_PERCENT=100
 SEGMENTATION_HEAD="ViTAdapterUNETR"
@@ -50,7 +50,7 @@ EPOCHS=100
 EPOCH_LENGTH=300
 EVAL_ITERS=600
 WARMUP_ITERS=3000
-IMAGE_SIZE=112
+IMAGE_SIZE=128
 BATCH_SIZE=2
 NUM_WORKERS=16
 LEARNING_RATE=1e-4
@@ -58,7 +58,7 @@ CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ca
 RESIZE_SCALE=1.0
 OVERLAP=0.75
 
-OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_b200_high_res_training_6249_${DATASET_NAME}_vit_adapter"
+OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_b200_high_res_128_training_6249_${DATASET_NAME}_vit_adapter"
 CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
 
 mkdir -p "$CACHE_DIR"
