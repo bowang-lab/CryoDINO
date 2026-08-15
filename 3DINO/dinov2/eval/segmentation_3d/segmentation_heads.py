@@ -240,7 +240,7 @@ class ViTAdapterUNETRHead(nn.Module):
         self.autocast_ctx = autocast_ctx
         self.input_channels = input_channels
         self.deep_supervision = deep_supervision
-        self.feature_model = ViTAdapter(feature_model, input_channels)
+        self.feature_model = ViTAdapter(feature_model, input_channels, pretrain_size=image_size)
         self.hidden_size = self.feature_model.vit_model.num_features
         self.feature_size = 32
         self.patch_size = self.feature_model.vit_model.patch_embed.patch_size
