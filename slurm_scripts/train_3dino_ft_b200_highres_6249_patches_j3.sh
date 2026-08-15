@@ -124,5 +124,36 @@ else
     cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 fi
 
+# TEMPORARY: rerun baseline inference for Dataset049 — remove after this run
+BASELINE_OUTPUT_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/baselines"
+BASELINE_DATASET_NAME="Dataset049_EMPIAR_12049_transposed_patches512"
+BASELINE_NUM_CLASSES=4
+BASELINE_DATALIST="${BASE_DATA_DIR}/${BASELINE_DATASET_NAME}_100_datalist.json"
+
+cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+
+for BASELINE_MODEL in unet unetr; do
+    BASELINE_CHECKPOINT="${BASELINE_OUTPUT_BASE}/${BASELINE_MODEL}_${BASELINE_DATASET_NAME}/best_model.pth"
+    BASELINE_INFER_OUTPUT_DIR="${BASELINE_OUTPUT_BASE}/${BASELINE_MODEL}_${BASELINE_DATASET_NAME}/inference"
+    mkdir -p "$BASELINE_INFER_OUTPUT_DIR"
+
+    if [ ! -f "$BASELINE_CHECKPOINT" ]; then
+        echo "  [SKIP baseline inference] checkpoint not found: $BASELINE_CHECKPOINT"
+    else
+        OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python ../baselines/inference.py \
+          --model-name "$BASELINE_MODEL" \
+          --checkpoint "$BASELINE_CHECKPOINT" \
+          --image-size "$IMAGE_SIZE" \
+          --num-classes "$BASELINE_NUM_CLASSES" \
+          --datalist "$BASELINE_DATALIST" \
+          --dataset-name "$BASELINE_DATASET_NAME" \
+          --output-dir "$BASELINE_INFER_OUTPUT_DIR" \
+          --batch-size "$BATCH_SIZE" \
+          --cpu-metrics
+
+        echo "Finished baseline inference: $BASELINE_INFER_OUTPUT_DIR"
+    fi
+done
+
 echo "Done!"
 date

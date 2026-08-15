@@ -195,6 +195,19 @@ def build_transforms(dataset_name):
             Lambda(func=lambda x: (x > 0).float()),
             EnsureType(),
         ])
+    elif "12049" in dataset_name:
+        def _remap_12049(x):
+            out = torch.zeros_like(x)
+            out[x == 2] = 1
+            out[x == 3] = 2
+            out[x == 4] = 3
+            return out.float()
+        label_transforms = Compose([
+            LoadImage(image_only=True),
+            EnsureChannelFirst(),
+            Lambda(func=_remap_12049),
+            EnsureType(),
+        ])
     else:
         label_transforms = Compose([
             LoadImage(image_only=True),
