@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J cryodino_3dino-ft-b200-128-6249-j1
+#SBATCH -J cryodino_3dino-ft-b200-128-6249-j1-newaug
 #SBATCH -p gpu_pmcc_ai_team
 #SBATCH -t 2-00:00:00
 #SBATCH --account=pmcc_ai_team_gpu
@@ -56,7 +56,7 @@ CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ca
 RESIZE_SCALE=1.0
 OVERLAP=0.75
 
-OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_b200_high_res_128_training_6249_${DATASET_NAME}_vit_adapter"
+OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_b200_high_res_128_training_6249_${DATASET_NAME}_vit_adapter_newaug"
 # Reuse the LP sweep's warm per-dataset cache (data-item-keyed, shared across
 # all backbones/heads/image_sizes — see linear-probing project memory).
 CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"

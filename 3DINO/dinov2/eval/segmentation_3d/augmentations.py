@@ -640,6 +640,7 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int, train_featu
         )
         from torchio.transforms import RandomAffine
         from skimage.util import random_noise
+        from .spectral_augmentations import RandFourierRadialPerturbd, RandCTFShapedSpectrald
         class random_salt_pepper(Transform):
             def __call__(self, image_dict):
                 # randomly apply salt and pepper noise on 1 percent of the data
@@ -783,7 +784,22 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int, train_featu
             ## AA EXPERIMENT END
 
             ## AA EXPERIMENT 4: dataset-specific augmentations (best per dataset from results.md)
-            # DS001/DS010 → Pretrain-Matched | DS989 → Pretrain+Ext | DS049 → nnUNet-Matched
+            # DS001 → Pretrain-Matched | DS010/DS989 → Pretrain-Matched/+Ext + spectral aug
+            # DS049 → nnUNet-Matched
+            # Spectral aug: phase-preserving Fourier-magnitude perturbations (see
+            # spectral_augmentations.py) to mimic cross-tomogram texture/CTF shifts,
+            # given DS010/DS989's train/val/test splits are separate acquisition
+            # sessions with very few tomograms each. OneOf so each crop gets one
+            # flavor (free-form radial or CTF-shaped), not a compounded double-hit;
+            # each branch's own prob gates whether anything is applied at all.
+            def _spectral_aug(apix):
+                return OneOf([
+                    RandFourierRadialPerturbd(keys=["image"], prob=0.3, gain_range=(0.5, 2.0),
+                                               num_control_points=6),
+                    RandCTFShapedSpectrald(keys=["image"], prob=0.3, df_range=(20000.0, 30000.0),
+                                            floor=0.6, apix=apix),
+                ], weights=[0.5, 0.5])
+
             _crop = [
                 RandCropByPosNegLabeld(
                     keys=["image", "label"], label_key="label",
@@ -808,7 +824,7 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int, train_featu
                 EnsureTyped(keys=["image", "label"]),
             ]
             if "12049" in dataset_name:
-                # nnUNet-Matched (best for DS049)
+                # nnUNet-Matched (best for DS049) + spectral aug
                 train_transforms = Compose(
                     load_transforms + _crop + [
                         RandomAffine(include=["image", "label"], p=0.2, degrees=(30, 30, 30), scales=(0.7, 1.4), default_pad_value='mean'),
@@ -825,13 +841,15 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int, train_featu
                         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 1)),
                         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(1, 2)),
                         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 2)),
+                        _spectral_aug(apix=13.48),
                         RandGibbsNoised(keys=["image"], prob=0.2),
                         RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=0.15),
                         EnsureTyped(keys=["image", "label"]),
                     ]
                 )
             elif "10989" in dataset_name:
-                # Pretrain+Ext (best for DS989)
+                # Pretrain+Ext (best for DS989) + spectral aug (single train/val/test tomo —
+                # cross-session texture/CTF augmentation targets exactly this bottleneck)
                 train_transforms = Compose(
                     load_transforms + _crop + [
                         RandomAffine(include=["image", "label"], p=0.2, degrees=(30, 30, 30), scales=(0.7, 1.4), default_pad_value='mean'),
@@ -841,6 +859,7 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int, train_featu
                         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 1)),
                         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(1, 2)),
                         RandRotate90d(keys=["image", "label"], prob=0.3, spatial_axes=(0, 2)),
+                        _spectral_aug(apix=13.48),
                         RandAdjustContrastd(keys=["image"], prob=0.8, gamma=(0.5, 2)),
                         OneOf([RandGaussianSmoothd(keys=["image"], prob=0.1), RandGaussianSharpend(keys=["image"], prob=0.1)]),
                         RandGibbsNoised(keys=["image"], prob=0.2),
@@ -852,9 +871,16 @@ def make_transforms(dataset_name, image_size, resize_scale, min_int, train_featu
                         EnsureTyped(keys=["image", "label"]),
                     ]
                 )
+            elif "10010" in dataset_name:
+                # Pretrain-Matched (best for DS010) + spectral aug
+                train_transforms = Compose(
+                    load_transforms + _crop + _pretrain_matched[:6] + [_spectral_aug(apix=13.4)] + _pretrain_matched[6:]
+                )
             else:
-                # Pretrain-Matched (best for DS001, DS010)
-                train_transforms = Compose(load_transforms + _crop + _pretrain_matched)
+                # Pretrain-Matched (best for DS001) + spectral aug
+                train_transforms = Compose(
+                    load_transforms + _crop + _pretrain_matched[:6] + [_spectral_aug(apix=13.48)] + _pretrain_matched[6:]
+                )
             ## AA EXPERIMENT 4 END
 
             ## AA EXPERIMENT 5: aggressive augmentations to cover intensity distribution shifts
