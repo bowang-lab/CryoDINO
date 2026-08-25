@@ -7,7 +7,7 @@
 #SBATCH --account=pmcc_ai_team_gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=10
-#SBATCH --mem=64G
+#SBATCH --mem=220G
 #SBATCH --time=24:00:00
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
