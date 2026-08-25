@@ -1,0 +1,75 @@
+# DeePiCt 3D-CNN config template — copy, edit the CAPITALS, drop in your dataset.
+# Trains a fixed schedule of `epochs` x `iterations_per_epoch` (see deepict_train.py).
+
+dataset_table: "/ABS/PATH/metadata.csv"      # CSV: tomo_name,tomo,<region_col>,<class>_mask
+output_dir: "/ABS/PATH/out"                  # models + logging land here
+work_dir:   "/ABS/PATH/work"                 # partition .h5 files land here
+model_path: "/ABS/PATH/out/MODEL.pth"
+
+cluster:
+  logdir: "/ABS/PATH/logs"
+
+tomos_sets:
+  training_list: ["TOMO_A", "TOMO_B"]        # tomo_name values used for training
+  prediction_list: []                        # tomo_name values to segment later (can be empty)
+
+cross_validation:
+  active: false
+  folds: 2
+  statistics_file: "cv_statistics.csv"
+
+training:
+  active: true
+  semantic_classes: ['particle']             # one output channel per class; needs <class>_mask column(s)
+  processing_tomo: "tomo"                     # raw-tomogram column in the CSV
+  box_size: 64                               # cubic patch side sampled from each tomogram
+  min_label_fraction: 0.001                  # keep a box only if >= this fraction is labeled
+  overlap: 12                                # box overlap when partitioning
+  batch_size: 4
+  force_retrain: false
+  iterations_per_epoch: 300                  # <-- fixed iters/epoch (deepict_train.py)
+
+  unet_hyperparameters:
+    depth: 2
+    initial_features: 8
+    epochs: 100                              # <-- fixed number of epochs
+    train_split: 0.8                         # train/val split WITHIN training_list boxes
+    batch_norm: True
+    encoder_dropout: 0
+    decoder_dropout: 0.2
+    loss: "Dice"                             # "Dice" or "GeneralizedDice"
+
+  data_augmentation:
+    rounds: 0                                # >0 adds offline augmented copies (rot/elastic/noise)
+    rot_angle: 180
+    elastic_alpha: 0
+    sigma_gauss: 1
+    salt_pepper_p: 0.01
+    salt_pepper_ampl: 0.1
+
+prediction:
+  active: false
+  semantic_class: 'particle'
+
+postprocessing_clustering:
+  active: false
+  threshold: 0.5
+  min_cluster_size: 100
+  max_cluster_size: null
+  clustering_connectivity: 3
+  calculate_motl: False
+  ignore_border_thickness: [10, 20, 10]
+  region_mask: 'lamella_file'                # region/masking column name in the CSV
+  contact_mode: "intersection"
+  contact_distance: 10
+
+evaluation:
+  particle_picking:
+    active: false
+    pr_tolerance_radius: 10
+    statistics_file: "pr_statistics.csv"
+  segmentation_evaluation:
+    active: false
+    statistics_file: "dice_eval.csv"
+
+debug: True
