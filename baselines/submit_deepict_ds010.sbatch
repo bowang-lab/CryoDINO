@@ -12,7 +12,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/projects/bwanggroup/reza/projects/cryoet/slurm_logs/%x_%j.log
 set -euo pipefail
 
 date
