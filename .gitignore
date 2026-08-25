@@ -1,6 +1,9 @@
 # output
 output/
 
+# cloned baseline repos (fetched by baselines/deepict/setup.sh, not part of this repo)
+baselines/deepict/DeePiCt/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
