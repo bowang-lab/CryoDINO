@@ -25,6 +25,7 @@
    - [Configuration](#configuration)
    - [Sample Fine-tuning Script](#sample-fine-tuning-script-slurm)
 5. [Inference](#inference)
+   - [Baseline Inference (MemBrain-seg / DeePiCt)](#baseline-inference-membrain-seg--deepict)
 6. [Visualization](#visualization)
 7. [License](#license)
 8. [Citation](#citation)
@@ -295,6 +296,64 @@ inference_output/
 ├── <tomogram_name>.nii.gz   # predicted segmentation mask (uint8)
 └── metrics.json             # per-image and mean Dice scores (if labels provided)
 ```
+
+---
+
+### Baseline Inference (MemBrain-seg / DeePiCt)
+
+Two baselines can be evaluated through the same interface, so their numbers drop straight into the
+same results table. Both are **inference only** — training lives in the separate `membrain_kit/`
+and `deepict/` pipelines — and both accept the same `--datalist` / `--input-dir` + `--label-dir`
+input modes as `segmentation3d_inference.py`.
+
+> These scripts do **not** import `3DINO/`. Run them in the venv that has `membrain_seg` and the
+> DeePiCt dependencies, *not* the `cryoet` conda env:
+> ```bash
+> module load python/3.11 && source /path/to/venvs/membrain/bin/activate
+> ```
+
+**MemBrain-seg** ([teamtomo/membrain-seg](https://github.com/teamtomo/membrain-seg)):
+```bash
+python inference/membrain_inference.py \
+    --checkpoint  /path/to/membrain_binary-<best>.ckpt \
+    --datalist    /path/to/datalist.json \
+    --output-dir  /path/to/membrain_inference/ \
+    --sw-roi-size 160          # multiple of 32; lower it if the GPU is tight
+```
+Add `--no-tta` to skip membrain's 8-fold mirroring (≈8× faster, worse), `--threshold` to move the
+membrane-score cutoff, and `--keep-native` to retain membrain's own `.mrc` outputs.
+
+**DeePiCt** ([ZauggGroup/DeePiCt](https://github.com/ZauggGroup/DeePiCt)):
+```bash
+python inference/deepict_inference.py \
+    --model-path    /path/to/out/model_best.pth \
+    --train-config  /path/to/the/training/config.yaml \
+    --deepict-root  /path/to/DeePiCt \
+    --datalist      /path/to/datalist.json \
+    --output-dir    /path/to/deepict_inference/ \
+    --threshold     0.5
+```
+The script generates a prediction-only DeePiCt config and drives the upstream stages unchanged
+(`generate_prediction_partition.py` → `segment.py` → `assemble_prediction.py`), then thresholds the
+assembled sigmoid probability map at `--threshold`. Pass `--train-config` so `box_size` and
+`overlap` match training; the network shape itself is read from the checkpoint's `model_descriptor`.
+`--keep-intermediates` retains the converted `.mrc` inputs, partitions and raw probability maps.
+
+**Outputs** — identical layout to `segmentation3d_inference.py`:
+```
+<output-dir>/
+├── <tomogram_name>.nii.gz   # predicted binary mask (uint8)
+└── metrics.json             # per-image and overall Dice / HD95
+```
+`metrics.json` uses the same schema (`per_image{avg_dice, per_class_dice, avg_hd95,
+per_class_hd95}` plus `overall_*`), with a few extra top-level keys recording the checkpoint and
+threshold that produced the numbers. `inference/baseline_common.py` carries a verbatim copy of
+`CryoMetrics` from `inference/segmentation3d_inference.py` — that module cannot be imported here
+because its `dinov2` imports run at module scope, so the metric is duplicated rather than shared.
+The copy is guarded: `inference/test_baseline_eval.py` compares the two class bodies as text and
+fails if they diverge, so the three methods cannot silently drift apart. Labels are always
+binarised (`> 0`), since both baselines are binary.
+
 
 ---
 
