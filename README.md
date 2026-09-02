@@ -314,7 +314,7 @@ input modes as `segmentation3d_inference.py`.
 
 **MemBrain-seg** ([teamtomo/membrain-seg](https://github.com/teamtomo/membrain-seg)):
 ```bash
-python inference/membrain_inference.py \
+python baselines/membrain_inference.py \
     --checkpoint  /path/to/membrain_binary-<best>.ckpt \
     --datalist    /path/to/datalist.json \
     --output-dir  /path/to/membrain_inference/ \
@@ -325,7 +325,7 @@ membrane-score cutoff, and `--keep-native` to retain membrain's own `.mrc` outpu
 
 **DeePiCt** ([ZauggGroup/DeePiCt](https://github.com/ZauggGroup/DeePiCt)):
 ```bash
-python inference/deepict_inference.py \
+python baselines/deepict_inference.py \
     --model-path    /path/to/out/model_best.pth \
     --train-config  /path/to/the/training/config.yaml \
     --deepict-root  /path/to/DeePiCt \
@@ -347,10 +347,10 @@ assembled sigmoid probability map at `--threshold`. Pass `--train-config` so `bo
 ```
 `metrics.json` uses the same schema (`per_image{avg_dice, per_class_dice, avg_hd95,
 per_class_hd95}` plus `overall_*`), with a few extra top-level keys recording the checkpoint and
-threshold that produced the numbers. `inference/baseline_common.py` carries a verbatim copy of
+threshold that produced the numbers. `baselines/baseline_common.py` carries a verbatim copy of
 `CryoMetrics` from `inference/segmentation3d_inference.py` — that module cannot be imported here
 because its `dinov2` imports run at module scope, so the metric is duplicated rather than shared.
-The copy is guarded: `inference/test_baseline_eval.py` compares the two class bodies as text and
+The copy is guarded: `baselines/test_baseline_eval.py` compares the two class bodies as text and
 fails if they diverge, so the three methods cannot silently drift apart. Labels are always
 binarised (`> 0`), since both baselines are binary.
 
