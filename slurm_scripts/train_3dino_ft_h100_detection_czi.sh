@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-detection-czi
-#SBATCH -p gpu_bwanggroup
+#SBATCH -J 3dino-ft-detection-czi-b200
+#SBATCH -p gpu_pmcc_ai_team
 #SBATCH -t 3-00:00:00
-#SBATCH --account=bwanggroup_gpu
+#SBATCH --account=pmcc_ai_team_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -13,9 +13,13 @@
 #SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
-# Fine-tuning: h100_high_res training_9374 — DETECTION (CZI)
+# Fine-tuning: b200_high_res_128 training_6249 — DETECTION (CZI)
 # Pre-extracted 128^3 overlapping patches (.pt) with GT point coords, ViTAdapterUNETR head.
 # Adapted from train_3dino_ft_h100_highres_9374_patches.sh (segmentation).
+# Backbone swapped from H100/training_9374 to B200 highres128/training_6249 — the checkpoint
+# behind CryoDINO's best full-fine-tuning (ViTAdapterUNETR) result on DS010 (Dice 0.8474);
+# NOT the LP-sweep "robust winner" (b200_highres112), since that finding was for a frozen
+# linear probe, not full fine-tuning like this detection head uses.
 #
 # Key differences vs segmentation:
 #   * downstream_patch_generation.py runs in --detection mode (CSV point
@@ -36,7 +40,7 @@ pwd
 nvidia-smi
 
 source ~/.bashrc
-conda activate cryoet
+conda activate cryodino
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
@@ -56,7 +60,7 @@ mkdir -p "$BASE_OUTPUT_DIR"
 # Fixed Parameters
 # =========================
 CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res_128/eval/training_6249/teacher_checkpoint.pth"
 DATASET_NAME="czi"            # loaders.py: czi → 6 classes (byu → 1)
 DATASET_PERCENT=100
 SEGMENTATION_HEAD="ViTAdapterUNETR"
@@ -70,8 +74,8 @@ NUM_WORKERS=10
 LEARNING_RATE=1e-4
 RESIZE_SCALE=1.0
 
-OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_detection_vit_adapter"
-CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_detection"
+OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_b200_high_res_128_training_6249_${DATASET_NAME}_detection_vit_adapter"
+CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_b200_high_res_128_training_6249_${DATASET_NAME}_detection"
 
 rm -rf "$CACHE_DIR"
 mkdir -p "$CACHE_DIR"
