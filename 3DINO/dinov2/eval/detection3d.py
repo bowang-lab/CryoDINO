@@ -406,8 +406,8 @@ def do_finetune(feature_model, autocast_dtype, args):
     elif args.segmentation_head == 'Linear':
         seg_model = LinearDecoderHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
     elif args.segmentation_head == 'ViTAdapterUNETR':
-        seg_model = ViTAdapterUNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx,
-                                        deep_supervision=args.deep_supervision)
+        # AA: ViTAdapterUNETRHead has no deep_supervision (removed with decoder1); passing it raised TypeError
+        seg_model = ViTAdapterUNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
     else:
         raise ValueError(f"Unknown segmentation head: {args.segmentation_head}")
 
@@ -480,6 +480,8 @@ def do_finetune(feature_model, autocast_dtype, args):
     best_val_f4    = -1.0
     top5_heap      = []          # min-heap (f4, iter, ckpt_path) — keeps top-5 checkpoints
     train_loss_sum = 0
+    train_loss_count = 0
+    window_sum, window_count, window_dict = 0.0, 0, {}
     iters_list          = []
     train_loss_list     = []
     val_f4_list         = []
@@ -507,11 +509,25 @@ def do_finetune(feature_model, autocast_dtype, args):
             loss_fn=loss_fn,
         )
         train_loss_sum += train_loss
+        train_loss_count += 1
+
+        # AA: running mean over the print window, not a single iteration. The per-iter loss is
+        # normalized by assigned_scores.sum().clamp_min(1), which differs between batches with and
+        # without particles, so single samples look flat-and-noisy even while training progresses.
+        window_sum += train_loss
+        window_count += 1
+        for _k, _v in train_loss_dict.items():
+            window_dict[_k] = window_dict.get(_k, 0.0) + _v
 
         if it % 100 == 0:
-            print(f"[Iter {it}], Train loss: {train_loss}", flush=True)
+            _m = {k: v / window_count for k, v in window_dict.items()}
+            print(f"[Iter {it}] train loss (mean/{window_count}): {window_sum / window_count:.4f}  "
+                  f"cls: {_m.get('cls_loss', 0):.4f}  reg: {_m.get('reg_loss', 0):.5f}  "
+                  f"divisor: {_m.get('num_items_in_batch', 0):.1f}  "
+                  f"lr: {scheduler.get_last_lr()[0]:.3e}", flush=True)
+            window_sum, window_count, window_dict = 0.0, 0, {}
 
-        if it % args.eval_iters == 0:
+        if it > 0 and it % args.eval_iters == 0:
             # AA: old segmentation val block:
             # total_val_dice = 0
             # total_per_cls_val_dice = [0 for _ in range(num_classes)]
@@ -561,12 +577,14 @@ def do_finetune(feature_model, autocast_dtype, args):
             best_f4, best_thr, best_per_cls = detection_metric.threshold_sweep()
             detection_metric.reset()
 
-            avg_train_loss = train_loss_sum / args.eval_iters
+            # AA: divide by the iterations actually accumulated, not args.eval_iters
+            avg_train_loss = train_loss_sum / max(train_loss_count, 1)
             train_loss_list.append(avg_train_loss)
             val_f4_list.append(best_f4)
             val_per_cls_f4_list.append({k: float(v) for k, v in best_per_cls.items()})
             iters_list.append(it)
             train_loss_sum = 0
+            train_loss_count = 0
 
             print(f"[Iter {it}] Train loss: {avg_train_loss:.4f}, Val F4: {best_f4:.4f}", flush=True)
             print(f"Val per-class F4: {best_per_cls}", flush=True)
