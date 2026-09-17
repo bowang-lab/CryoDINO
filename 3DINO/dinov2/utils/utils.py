@@ -31,7 +31,23 @@ def load_pretrained_weights(model, pretrained_weights, checkpoint_key):
     # remove `backbone.` prefix induced by multicrop wrapper
     state_dict = {k.replace("backbone.", ""): v for k, v in state_dict.items()}
     msg = model.load_state_dict(state_dict, strict=False)
-    logger.info("Pretrained weights found at {} and loaded with msg: {}".format(pretrained_weights, msg))
+    # AA: strict=False silently tolerates a total key mismatch (wrong arch / wrong checkpoint),
+    # which leaves the backbone RANDOM while training proceeds normally — a flat loss with no
+    # error. Report how much actually loaded so that failure is visible in the log.
+    model_keys = set(model.state_dict())
+    matched = [k for k in model_keys if k in state_dict and state_dict[k].shape == model.state_dict()[k].shape]
+    logger.info(
+        "Loaded {}/{} backbone params ({:.1f}%) from {} | missing={} unexpected={}".format(
+            len(matched), len(model_keys), 100.0 * len(matched) / max(len(model_keys), 1),
+            pretrained_weights, len(msg.missing_keys), len(msg.unexpected_keys),
+        )
+    )
+    if not matched:
+        raise RuntimeError(
+            f"No parameters loaded from {pretrained_weights}: none of the {len(state_dict)} "
+            f"checkpoint keys matched the model. The backbone would be randomly initialized."
+        )
+    return msg
 
 
 def fix_random_seeds(seed=31):

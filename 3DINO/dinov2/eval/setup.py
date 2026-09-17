@@ -36,6 +36,13 @@ def get_args_parser(
         help="Pretrained model weights",
     )
     parser.add_argument(
+        "--allow-random-init",
+        action="store_true",
+        help="Proceed with a RANDOMLY initialized backbone if --pretrained-weights is missing. "
+             "Off by default: a silently random frozen backbone looks exactly like a model that "
+             "will not learn.",
+    )
+    parser.add_argument(
         "--output-dir",
         default="",
         type=str,
@@ -60,13 +67,22 @@ def get_autocast_dtype(config):
         return torch.float
 
 
-def build_model_for_eval(config, pretrained_weights):
+def build_model_for_eval(config, pretrained_weights, allow_random_init=False):
     model, _ = build_model_from_cfg(config, only_teacher=True)
     try:
         dinov2_utils.load_pretrained_weights(model, pretrained_weights, "teacher")
-    except FileNotFoundError as e:
-        print(e)
-        print('No weights found, using random initialization!')
+    except FileNotFoundError:
+        # AA: this used to print and carry on, which silently trains a frozen RANDOM backbone —
+        # indistinguishable from "the model won't learn" in a long log. Fail loudly instead;
+        # pass --allow-random-init to opt in deliberately (e.g. an ablation).
+        if not allow_random_init:
+            raise FileNotFoundError(
+                f"Pretrained weights not found: {pretrained_weights}. The backbone would be "
+                f"randomly initialized and the model could not learn. Pass --allow-random-init "
+                f"if that is genuinely what you want."
+            )
+        print(f"No weights found at {pretrained_weights}; --allow-random-init given, "
+              f"continuing with RANDOM initialization.", flush=True)
     model.eval()
     model.cuda()
     return model
@@ -75,6 +91,7 @@ def build_model_for_eval(config, pretrained_weights):
 def setup_and_build_model_3d(args) -> Tuple[Any, torch.dtype]:
     cudnn.benchmark = True
     config = setup_3d(args)
-    model = build_model_for_eval(config, args.pretrained_weights)
+    model = build_model_for_eval(config, args.pretrained_weights,
+                                 allow_random_init=getattr(args, 'allow_random_init', False))
     autocast_dtype = get_autocast_dtype(config)
     return model, autocast_dtype
