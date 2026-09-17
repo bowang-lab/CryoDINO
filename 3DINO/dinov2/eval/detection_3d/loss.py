@@ -342,7 +342,10 @@ def object_detection_loss(
     else:
         cls_loss = focal_loss(pred_logits, assigned_scores, alpha=-1)
 
-    if use_cross_entropy_loss or True:
+    # AA: was `if use_cross_entropy_loss or True:` — a debug leftover that made the softmax CE
+    # term unconditional, so the documented default (False) silently added it on top of the
+    # varifocal loss. Covered by test_loss.py::test_cross_entropy_term_respects_its_flag.
+    if use_cross_entropy_loss:
         bg_label_mask = assigned_labels.eq(num_classes)
         ce_loss = F.cross_entropy(
             input=pred_logits.permute(0, 2, 1),
