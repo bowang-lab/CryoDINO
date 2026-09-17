@@ -256,6 +256,23 @@ class LinearDecoderHead(nn.Module):
         return self.resize(self.cls_head(cat_feats)), self.resize(self.off_head(cat_feats))
 
 
+def _pretrain_size_from(vit_model, fallback):
+    """Side length whose //16 grid matches the ViT's pos_embed token count.
+
+    ViTAdapter reshapes pos_embed to (pretrain_size // 16)^3; if that disagrees with the
+    checkpoint the reshape raises, so infer it from the weights rather than guessing.
+    """
+    try:
+        n_tokens = vit_model.pos_embed.shape[1] - 1          # drop the cls token
+        patch = vit_model.patch_embed.patch_size[0]
+        grid = round(n_tokens ** (1.0 / 3.0))
+        if grid ** 3 == n_tokens:
+            return grid * patch
+    except (AttributeError, IndexError, TypeError):
+        pass
+    return fallback
+
+
 class ViTAdapterUNETRHead(nn.Module):
 
     # AA: deep_supervision removed; num_classes = number of particle classes (e.g. 6)
@@ -265,7 +282,13 @@ class ViTAdapterUNETRHead(nn.Module):
         self.autocast_ctx = autocast_ctx
         self.input_channels = input_channels
         # self.deep_supervision = deep_supervision  # AA: removed
-        self.feature_model = ViTAdapter(feature_model, input_channels)
+        # AA: ViTAdapter._get_pos_embed reshapes pos_embed to (pretrain_size // 16)^3, so
+        # pretrain_size must describe the CHECKPOINT's pos_embed grid — not the finetune
+        # image size. The default 112 gives 7^3 = 343 and blows up on a 128-crop checkpoint
+        # (8^3 = 512 tokens). segmentation_heads.py:243 (commit ef2cdfd) passes image_size,
+        # which only works when the two happen to coincide; derive it from the weights instead.
+        self.feature_model = ViTAdapter(feature_model, input_channels,
+                                        pretrain_size=_pretrain_size_from(feature_model, image_size))
         self.hidden_size = self.feature_model.vit_model.num_features
         self.feature_size = 32
         self.patch_size = self.feature_model.vit_model.patch_embed.patch_size
