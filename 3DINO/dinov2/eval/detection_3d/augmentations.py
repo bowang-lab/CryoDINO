@@ -192,7 +192,15 @@ def _load_detection_image(x):
 # make_transforms — main entry point
 # ---------------------------------------------------------------------------
 
-def make_transforms(crop_size: int = 96):  # noqa: ARG001
+# MONAI's RandScaleIntensity multiplies by (1 + factor), so the pretrain-matched (1/1.1, 1.1)
+# is a ~1.9-2.1x multiplier (training inputs ~[-2.1, 2.1]), not 0.9-1.1x. Kept as the default so
+# CryoDINO (detection3d.py) keeps matching its pretraining (dinov2/data/augmentations.py);
+# INTENDED_SCALE_FACTORS gives the 0.9-1.1x that keeps inputs on the [-1, 1] eval-tile scale.
+PRETRAIN_SCALE_FACTORS = (1 / 1.1, 1.1)
+INTENDED_SCALE_FACTORS = (-0.1, 0.1)
+
+
+def make_transforms(crop_size: int = 96, scale_factors=PRETRAIN_SCALE_FACTORS):  # noqa: ARG001
     """Return (train_transforms, val_transforms) for 3D detection on CryoET.
 
     Pretrain-matched augmentation schedule (same as DS001/DS010 in seg Exp 4):
@@ -201,6 +209,8 @@ def make_transforms(crop_size: int = 96):  # noqa: ARG001
 
     Args:
         crop_size : side length of cubic patch (default 96; patches are pre-extracted)
+        scale_factors : RandScaleIntensityd factors (multiplier = 1 + factor); default is the
+                        pretrain-matched ~2x, see PRETRAIN_SCALE_FACTORS
 
     Returns:
         (train_transforms, val_transforms) — both are monai.transforms.Compose objects
@@ -242,7 +252,7 @@ def make_transforms(crop_size: int = 96):  # noqa: ARG001
             RandGaussianSharpend(keys=["image"], prob=0.1),
         ]),
         RandGibbsNoised(keys=["image"], prob=0.2),
-        RandScaleIntensityd(keys=["image"], factors=(1 / 1.1, 1.1), prob=1.0),
+        RandScaleIntensityd(keys=["image"], factors=scale_factors, prob=1.0),
         RandShiftIntensityd(keys=["image"], offsets=0.1, safe=False, prob=1.0),
         RandGaussianNoised(keys=["image"], prob=1.0, std=0.002),
         EnsureTyped(keys=["image"]),
