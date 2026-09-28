@@ -101,3 +101,41 @@ def test_rot90_is_identity_after_four_quarter_turns():
         d = t(d)
 
     np.testing.assert_allclose(d[POINTS_KEY][:, :3], _points(coords)[:, :3], atol=1e-5)
+
+
+
+
+def _scale_multipliers(train_tf, n=50):
+    """Multipliers drawn by the single RandScaleIntensityd inside a make_transforms train pipeline."""
+    from monai.transforms import RandScaleIntensityd
+
+    scales = [t for t in train_tf.transforms if isinstance(t, RandScaleIntensityd)]
+    assert len(scales) == 1
+    ones = torch.ones(1, 4, 4, 4)
+    out = []
+    for seed in range(n):
+        scales[0].set_random_state(seed)
+        out.append(float(torch.as_tensor(scales[0]({IMAGE_KEY: ones.clone()})[IMAGE_KEY]).mean()))
+    return out
+
+
+def test_intended_scale_factors_keep_eval_range():
+    """INTENDED_SCALE_FACTORS must give ~0.9-1.1x, keeping inputs on the [-1, 1] eval-tile scale.
+
+    MONAI's RandScaleIntensity multiplies by (1 + factor), so factors=(1/1.1, 1.1) is ~2x; a
+    RetinaNet trained that way loses ~0.3 val F4 when evaluated on [-1, 1] tiles.
+    """
+    from dinov2.eval.detection_3d.augmentations import INTENDED_SCALE_FACTORS, make_transforms
+
+    train_tf, _ = make_transforms(scale_factors=INTENDED_SCALE_FACTORS)
+    for seed, m in enumerate(_scale_multipliers(train_tf)):
+        assert 0.85 < m < 1.15, f"seed {seed}: intensity multiplier {m:.3f}, expected ~0.9-1.1"
+
+
+def test_default_scale_factors_stay_pretrain_matched():
+    """The default must stay the pretrain-matched ~2x so CryoDINO fine-tuning (detection3d.py) is unchanged."""
+    from dinov2.eval.detection_3d.augmentations import make_transforms
+
+    train_tf, _ = make_transforms()
+    for seed, m in enumerate(_scale_multipliers(train_tf)):
+        assert 1.85 < m < 2.15, f"seed {seed}: intensity multiplier {m:.3f}, expected pretrain-matched ~2x"
