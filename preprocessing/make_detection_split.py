@@ -44,6 +44,12 @@ Usage
 
     # hold out only non-overlapping eval patches (see --deoverlap-eval caveat below)
     python make_detection_split.py ... --deoverlap-eval
+
+    # val/test as FULL tomograms (train stays .pt patches); detection3d.py then runs
+    # sliding-window inference over each whole tomogram. Feed the output via --datalist-json.
+    python make_detection_split.py ... \\
+        --tomo-dir /path/to/Dataset440_CZII_10440/imagesTr \\
+        --csv      /path/to/Dataset440_CZII_10440/point_annotations.csv
 """
 import argparse
 import json
@@ -52,6 +58,11 @@ import re
 from collections import Counter, defaultdict
 
 NUM_CLASSES = 6
+
+# Same radii (Å) as slurm_scripts/patchify_detection_czi.sh, so full-tomogram GT sigmas match
+# the sigmas baked into the training patches.
+CZI_SIGMAS_ANG = ('{"Beta-amylase":65,"Beta-galactosidase":90,"Thyroglobulin":130,'
+                  '"cytosolic ribosome":150,"ferritin complex":60,"virus-like capsid":135}')
 
 # Tomogram id = patch filename minus the trailing _<x>_<y>_<z>.pt offsets.
 PATCH_RE = re.compile(r'^(?P<tomo>.+?)_(?P<x>\d+)_(?P<y>\d+)_(?P<z>\d+)\.pt$')
@@ -63,6 +74,14 @@ def parse_patch_name(image_path):
     if m is None:
         raise ValueError(f"Cannot parse patch filename: {image_path}")
     return m.group('tomo'), int(m.group('x')), int(m.group('y')), int(m.group('z'))
+
+
+def tomo_of(image_path):
+    """Tomogram id of a datalist entry: a .pt patch or a full <run>_0000.nii.gz tomogram."""
+    base = os.path.basename(image_path)
+    if base.endswith('.nii.gz'):
+        return re.sub(r'_\d{4}\.nii\.gz$', '', base)
+    return parse_patch_name(image_path)[0]
 
 
 def n_valid_points(entry):
@@ -78,6 +97,38 @@ def is_non_overlapping(x, y, z, patch_size):
     the clamped x/y 502 edge. See --deoverlap-eval help for why it is off by default.
     """
     return x % patch_size == 0 and y % patch_size == 0 and z % patch_size == 0
+
+
+def full_tomo_entry(tomo, tomo_dir, annotations):
+    """One val/test entry for a whole tomogram: nii.gz path + global XYZ GT points."""
+    nii_path = os.path.join(tomo_dir, f"{tomo}_0000.nii.gz")
+    if not os.path.isfile(nii_path):
+        raise SystemExit(f"Tomogram not found: {nii_path}")
+    if tomo not in annotations:
+        raise SystemExit(f"No annotations for {tomo!r} in --csv")
+    info = annotations[tomo]
+    return {'image': nii_path, 'points': info['points'], 'voxel_size': info['voxel_size']}
+
+
+def check_patch_points_match_csv(by_tomo, annotations, tol=1e-3):
+    """Every training-patch point + its patch offset must be a CSV (global) point of that run.
+
+    Catches axis-order / offset mismatches between the patches and the full-tomogram GT,
+    which would otherwise silently make val/test F4 meaningless.
+    """
+    import numpy as np
+    for tomo, entries in by_tomo.items():
+        gt = np.asarray(annotations[tomo]['points'], dtype=np.float64)
+        for e in entries:
+            x0, y0, z0 = e['_offsets']
+            for p in e['points']:
+                if p[3] < 0:
+                    continue
+                g = np.array([p[0] + x0, p[1] + y0, p[2] + z0, p[3], p[4]])
+                if not np.any(np.all(np.abs(gt - g) < tol, axis=1)):
+                    raise AssertionError(
+                        f"patch point {p} in {e['image']} (offset {x0},{y0},{z0}) has no "
+                        f"matching CSV point in {tomo}")
 
 
 def main():
@@ -99,7 +150,19 @@ def main():
                          "inflating the score. Turning this on discards ~90%% of the eval data and "
                          "leaves the rarest class at ~6 instances, where one detection swings F4 "
                          "by ~0.17.")
+    ap.add_argument('--tomo-dir', default=None,
+                    help="Directory with full tomograms <run>_0000.nii.gz. With --csv, val/test "
+                         "become one full-tomogram entry each (global GT) instead of patches.")
+    ap.add_argument('--csv', default=None,
+                    help="Point annotations CSV (run,particle_name,z,y,x,voxel_size) for full-tomogram val/test GT.")
+    ap.add_argument('--sigmas-ang', default=CZI_SIGMAS_ANG,
+                    help="JSON {particle_name: radius_Å} for GT sigmas (default: CZI radii).")
     args = ap.parse_args()
+    full_tomo = bool(args.tomo_dir or args.csv)
+    if full_tomo and not (args.tomo_dir and args.csv):
+        ap.error("--tomo-dir and --csv must be given together")
+    if full_tomo and args.deoverlap_eval:
+        ap.error("--deoverlap-eval only applies to patch-based val/test, not --tomo-dir")
 
     with open(args.datalist_json) as f:
         source = json.load(f)
@@ -137,11 +200,21 @@ def main():
                 out.append({k: v for k, v in e.items() if k != '_offsets'})
         return out
 
-    split = {
-        'training':   collect(train_tomos, deoverlap=False),
-        'validation': collect([args.val_tomo], deoverlap=args.deoverlap_eval),
-        'test':       collect([args.test_tomo], deoverlap=args.deoverlap_eval),
-    }
+    if full_tomo:
+        from downstream_patch_generation import load_detection_annotations
+        annotations, _ = load_detection_annotations(args.csv, json.loads(args.sigmas_ang), 0.0)
+        check_patch_points_match_csv(by_tomo, annotations)
+        split = {
+            'training':   collect(train_tomos, deoverlap=False),
+            'validation': [full_tomo_entry(args.val_tomo, args.tomo_dir, annotations)],
+            'test':       [full_tomo_entry(args.test_tomo, args.tomo_dir, annotations)],
+        }
+    else:
+        split = {
+            'training':   collect(train_tomos, deoverlap=False),
+            'validation': collect([args.val_tomo], deoverlap=args.deoverlap_eval),
+            'test':       collect([args.test_tomo], deoverlap=args.deoverlap_eval),
+        }
 
     # --- assertions: the entire point of this script -------------------------------
     assignment = {t: 'training' for t in train_tomos}
@@ -151,8 +224,8 @@ def main():
 
     for name, items in split.items():
         assert items, f"split {name!r} is empty"
-        tomos_here = {parse_patch_name(e['image'])[0] for e in items}
-        others = set().union(*[{parse_patch_name(e['image'])[0] for e in v}
+        tomos_here = {tomo_of(e['image']) for e in items}
+        others = set().union(*[{tomo_of(e['image']) for e in v}
                                for k, v in split.items() if k != name])
         assert not (tomos_here & others), \
             f"LEAKAGE: {sorted(tomos_here & others)} appears in {name!r} and another split"
@@ -169,6 +242,7 @@ def main():
         'val_tomogram': args.val_tomo,
         'test_tomogram': args.test_tomo,
         'deoverlap_eval': args.deoverlap_eval,
+        'eval_mode': 'full_tomogram' if full_tomo else 'patches',
     }
 
     with open(args.output_json, 'w') as f:
@@ -176,16 +250,20 @@ def main():
 
     # --- summary --------------------------------------------------------------------
     print(f"wrote {args.output_json}")
-    print(f"{'split':<12}{'tomograms':<34}{'patches':>9}{'GT':>7}   per-class 0..5")
+    print(f"{'split':<12}{'tomograms':<34}{'entries':>9}{'GT':>7}   per-class 0..5")
     for name in ('training', 'validation', 'test'):
         items = split[name]
-        tomos = sorted({parse_patch_name(e['image'])[0] for e in items})
+        tomos = sorted({tomo_of(e['image']) for e in items})
         counts = Counter(int(p[3]) for e in items for p in e['points'] if p[3] >= 0)
         print(f"{name:<12}{','.join(tomos):<34}{len(items):>9}"
               f"{sum(counts.values()):>7}   {[counts.get(i, 0) for i in range(NUM_CLASSES)]}")
-    total = sum(len(split[s]) for s in ('training', 'validation', 'test'))
-    print(f"\ntotal patches {total} (source had {len(entries)})"
-          + ("" if args.deoverlap_eval else "; no patches dropped"))
+    if full_tomo:
+        print("\nval/test are FULL tomograms (global GT); training patch points verified "
+              "against --csv. Pass this json to detection3d.py via --datalist-json.")
+    else:
+        total = sum(len(split[s]) for s in ('training', 'validation', 'test'))
+        print(f"\ntotal patches {total} (source had {len(entries)})"
+              + ("" if args.deoverlap_eval else "; no patches dropped"))
     if args.deoverlap_eval:
         print("NOTE --deoverlap-eval dropped overlapping eval patches; rare-class counts above "
               "may be too small for a stable per-class F4.")

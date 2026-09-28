@@ -83,6 +83,13 @@ def add_seg_args(parser):
         help="Base data directory for finetuning dataset",
     )
     parser.add_argument(
+        "--datalist-json",
+        type=str,
+        default=None,
+        help="Explicit datalist json (training = .pt patches, validation/test = full .nii.gz "
+             "tomograms with global GT points). Overrides {base-data-dir}/{dataset-name}_100_datalist.json",
+    )
+    parser.add_argument(
         "--segmentation-head",
         type=str,
         help="Segmentation head",
@@ -361,7 +368,8 @@ def do_finetune(feature_model, autocast_dtype, args):
         train_transforms,
         val_transforms,
         args.cache_dir,
-        args.batch_size
+        args.batch_size,
+        datalist_override=args.datalist_json,
     )
     train_loader = make_data_loader(
         dataset=train_ds,

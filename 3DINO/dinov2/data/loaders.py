@@ -207,6 +207,7 @@ def make_detection_dataset_3d(
     val_transforms: Callable,
     cache_path: str,
     batch_size: int,
+    datalist_override: str = None,
 ):
     """
     Creates a 3d detection dataset with the specified parameters.
@@ -219,6 +220,8 @@ def make_detection_dataset_3d(
         val_transforms: Validation transforms to apply to images.
         cache_path: A path to a directory to cache the dataset, used in PersistentDataset.
         batch_size: Batch size for the dataset.
+        datalist_override: Optional explicit datalist json (training = .pt patches, validation/test =
+            full .nii.gz tomograms or patches). Overrides "{base_directory}/{dataset_name}_100_datalist.json".
     Returns:
         Created train, val, and test datasets, number of input channels, and number of classes for the dataset.
     """
@@ -233,6 +236,11 @@ def make_detection_dataset_3d(
         class_num = 6  # 6 particle classes; background is implicit (bg_index = num_classes)
     else:
         raise ValueError(f'Unsupported dataset "{dataset_name}"')
+
+    # AA: explicit --datalist-json overrides the default "{base_directory}/{name}_100_datalist.json"
+    if datalist_override is not None:
+        datalist_path = datalist_override
+    logger.info(f"detection datalist: {datalist_path}")
 
     with open(datalist_path, 'r') as json_f:
         datalist = json.load(json_f)

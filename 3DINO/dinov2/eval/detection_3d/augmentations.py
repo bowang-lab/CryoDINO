@@ -215,7 +215,10 @@ def make_transforms(crop_size: int = 96):  # noqa: ARG001
         # float32 ndarray so the geometric transforms (and collate) can index it.
         # reshape(-1, 5) keeps the right shape even for patches with zero points.
         Lambdad(keys=["points"], func=lambda p: np.asarray(p, dtype=np.float32).reshape(-1, 5)),
-        # Per-crop percentile clip to [-1, 1] — matches pretraining ScaleIntensityRangePercentilesd
+    ]
+
+    # Per-crop percentile clip to [-1, 1] — matches pretraining ScaleIntensityRangePercentilesd
+    _percentile = [
         ScaleIntensityRangePercentilesd(
             keys=["image"], lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False
         ),
@@ -245,7 +248,10 @@ def make_transforms(crop_size: int = 96):  # noqa: ARG001
         EnsureTyped(keys=["image"]),
     ]
 
-    train_transforms = Compose(_load + _geometric + _intensity)
+    train_transforms = Compose(_load + _percentile + _geometric + _intensity)
+    # AA: no percentile step for val/test — sliding_window_accumulate already applies the same
+    # 0.5-99.5 percentile normalization per tile. Applying it here too normalized the full
+    # tomogram once globally and then again per tile, unlike training (once per 128^3 patch).
     val_transforms   = Compose(_load + [EnsureTyped(keys=["image"])])
 
     return train_transforms, val_transforms
