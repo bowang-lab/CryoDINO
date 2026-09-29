@@ -24,6 +24,7 @@
    - [Downstream Patch Generation](#downstream-patch-generation)
    - [Configuration](#configuration)
    - [Sample Fine-tuning Script](#sample-fine-tuning-script-slurm)
+   - [Particle Detection (CZI)](#particle-detection-czi)
 5. [Inference](#inference)
    - [Baseline Inference (MemBrain-seg / DeePiCt)](#baseline-inference-membrain-seg--deepict)
 6. [Visualization](#visualization)
@@ -252,6 +253,10 @@ PYTHONPATH=. python dinov2/eval/segmentation3d.py \
   --cache-dir          "$CACHE_DIR" \
   --resize-scale       1.0
 ```
+
+### Particle Detection (CZI)
+
+Detection fine-tuning trains on 128³ `.pt` patches and validates/tests on **full tomograms**. See [DETECTION.md](DETECTION.md) for the datalist format, how to build it, and the SLURM launcher `slurm_scripts/train_3dino_ft_detection_czi_fulltomo.sh`.
 
 ---
 
