@@ -72,7 +72,7 @@ To override hyperparameters, set environment variables (defaults in brackets):
 | `EVAL_ITERS` | 1500 | a full-tomogram val pass every N iters |
 | `WARMUP_ITERS` | 3000 | |
 | `BATCH_SIZE`, `LEARNING_RATE` | 4, 1e-4 | |
-| `SEGMENTATION_HEAD` | ViTAdapterUNETR | also `UNETR`, `Linear` |
+| `SEGMENTATION_HEAD` | ViTAdapterUNETR | also `UNETR`, `Linear`, or `ResNetFPN`: a MONAI ResNet34-FPN trained from scratch with the same detection head, loss and evaluation; the same-loss CNN baseline, which ignores the pretrained weights |
 | `PRETRAINED_WEIGHTS` | b200 highres128 / training_6249 teacher | |
 | `NUM_WORKERS`, `DATASET_PERCENT` | 10, 100 | |
 

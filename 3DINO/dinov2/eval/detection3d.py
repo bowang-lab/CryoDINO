@@ -7,8 +7,9 @@
 
 from dinov2.data.loaders import make_detection_dataset_3d
 from dinov2.data import SamplerType, make_data_loader
-from dinov2.eval.detection_3d.detection_heads import UNETRHead, LinearDecoderHead, ViTAdapterUNETRHead
-from dinov2.eval.setup import get_args_parser, setup_and_build_model_3d
+from dinov2.eval.detection_3d.detection_heads import UNETRHead, LinearDecoderHead, ViTAdapterUNETRHead, ResNetFPNHead
+from dinov2.eval.setup import get_args_parser, setup_and_build_model_3d, get_autocast_dtype
+from dinov2.utils.config import setup_3d
 from dinov2.eval.detection_3d.augmentations import make_transforms
 from dinov2.eval.detection_3d.metrics import get_metric
 from dinov2.eval.detection_3d.loss import object_detection_loss, decode_detections_with_nms
@@ -416,10 +417,18 @@ def do_finetune(feature_model, autocast_dtype, args):
     elif args.segmentation_head == 'ViTAdapterUNETR':
         # AA: ViTAdapterUNETRHead has no deep_supervision (removed with decoder1); passing it raised TypeError
         seg_model = ViTAdapterUNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
+    elif args.segmentation_head == 'ResNetFPN':
+        # Same-loss CNN baseline: MONAI ResNet34-FPN from scratch + the same detection head
+        seg_model = ResNetFPNHead(input_channels, args.image_size, num_classes, autocast_ctx)
     else:
         raise ValueError(f"Unknown segmentation head: {args.segmentation_head}")
 
-    if args.train_feature_model:
+    # ResNetFPN has no pretrained backbone: every layer trains, so freezing does not apply
+    from_scratch = args.segmentation_head == 'ResNetFPN'
+
+    if from_scratch:
+        pass
+    elif args.train_feature_model:
         if args.segmentation_head == 'ViTAdapterUNETR':
             seg_model.feature_model.vit_model.train()
         else:
@@ -437,6 +446,9 @@ def do_finetune(feature_model, autocast_dtype, args):
 
     trainable_params = [name for name, param in seg_model.named_parameters() if param.requires_grad]
     print(f"Trainable parameters: {trainable_params}")
+    n_total = sum(p.numel() for p in seg_model.parameters())
+    n_train = sum(p.numel() for p in seg_model.parameters() if p.requires_grad)
+    print(f"{args.segmentation_head}: {n_total / 1e6:.2f}M params, {n_train / 1e6:.2f}M trainable", flush=True)
 
     # get optimizer, scheduler, loss function, metric
     optimizer = torch.optim.AdamW(filter(lambda x: x.requires_grad, seg_model.parameters()), lr=args.learning_rate)
@@ -614,7 +626,7 @@ def do_finetune(feature_model, autocast_dtype, args):
 
             # set back to train mode
             seg_model.train()
-            if not args.train_feature_model:
+            if not args.train_feature_model and not from_scratch:
                 if args.segmentation_head == 'ViTAdapterUNETR':
                     seg_model.feature_model.vit_model.eval()
                 else:
@@ -689,6 +701,13 @@ def do_finetune(feature_model, autocast_dtype, args):
 
 
 def main(args):
+    if args.segmentation_head == 'ResNetFPN':
+        # CNN from scratch: no DINO backbone to build or load (--pretrained-weights unused);
+        # the config is still read for output dir / logging and the autocast dtype.
+        torch.backends.cudnn.benchmark = True
+        config = setup_3d(args)
+        do_finetune(None, get_autocast_dtype(config), args)
+        return
     feature_model, autocast_dtype = setup_and_build_model_3d(args)
     do_finetune(feature_model, autocast_dtype, args)
 
