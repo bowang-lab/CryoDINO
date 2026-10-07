@@ -210,7 +210,7 @@ def main_detection(args):
         X, Y, Z = volume.shape
         print(f"  shape={volume.shape}  min={volume.min():.2f} max={volume.max():.2f}")
 
-        run_info = annotations.get(run, {'points': [], 'voxel_size': 10.0})
+        run_info = annotations.get(run, {'points': [], 'voxel_size': entry.get('voxel_size', 10.0)})
         vs       = float(run_info['voxel_size'])
         all_pts  = (np.array(run_info['points'], dtype=np.float32)
                     if run_info['points'] else np.zeros((0, 5), dtype=np.float32))
@@ -275,7 +275,7 @@ def main_detection(args):
         for entry in split_list:
             nii_path   = entry['image']
             run        = run_name_from_nii(nii_path)
-            run_info   = annotations.get(run, {'points': [], 'voxel_size': 10.0})
+            run_info   = annotations.get(run, {'points': [], 'voxel_size': entry.get('voxel_size', 10.0)})
             vs         = float(run_info['voxel_size'])
             all_points = run_info['points'] if run_info['points'] else [[-100.0, -100.0, -100.0, -100.0, -100.0]]
             print(f"  {run}: {len(run_info['points'])} particles  voxel_size={vs}")
