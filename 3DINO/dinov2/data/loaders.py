@@ -22,6 +22,40 @@ from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
 logger = logging.getLogger("dinov2")
 
 
+def _allow_monai_cache_unpickling():
+    """Let torch>=2.6 read MONAI's PersistentDataset cache files.
+
+    PersistentDataset writes each transformed item with torch.save and reads it back with a
+    bare ``torch.load(hashfile)`` (monai/data/dataset.py, no kwargs to override). Since torch
+    2.6 that defaults to ``weights_only=True``, which refuses the MONAI types in the cached
+    dict — so every cache *hit* raises UnpicklingError. Training therefore dies partway
+    through the first pass, once items start coming back from disk rather than being computed.
+
+    These four types are what the cached dicts actually contain (verified by loading a cache
+    file), and the files are ones we wrote ourselves, so allowing them is safe.
+    """
+    add_safe_globals = getattr(torch.serialization, "add_safe_globals", None)
+    if add_safe_globals is None:
+        return  # torch < 2.6: weights_only is not the default, nothing to do
+    try:
+        from monai.data.meta_tensor import MetaTensor
+        from monai.utils.enums import MetaKeys, SpaceKeys, TraceKeys
+        allowed = [MetaTensor, MetaKeys, SpaceKeys, TraceKeys]
+    except ImportError:  # pragma: no cover - MONAI layout changed
+        logger.warning("Could not import MONAI cache types; PersistentDataset cache hits may fail.")
+        return
+    # numpy types show up in the meta dict of NIfTI-backed items (affines); harmless if unused.
+    try:
+        import numpy as np
+        allowed += [np.ndarray, np.dtype]
+    except ImportError:
+        pass
+    add_safe_globals(allowed)
+
+
+_allow_monai_cache_unpickling()
+
+
 class SamplerType(Enum):
     DISTRIBUTED = 0
     EPOCH = 1
