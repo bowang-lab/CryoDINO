@@ -10,6 +10,8 @@ import torch
 import torch.nn as nn
 from monai.networks.blocks.dynunet_block import UnetOutBlock
 from monai.networks.blocks.unetr_block import UnetrBasicBlock, UnetrPrUpBlock, UnetrUpBlock
+from monai.networks.blocks.backbone_fpn_utils import BackboneWithFPN
+from monai.networks.nets import resnet34
 from ..segmentation_3d.vit_adapter import ViTAdapter
 
 
@@ -256,6 +258,36 @@ class LinearDecoderHead(nn.Module):
         return self.resize(self.cls_head(cat_feats)), self.resize(self.off_head(cat_feats))
 
 
+def _add_detection_heads(module, ch, num_classes):
+    """Attach the dense stride-2 detection head (cls + offset branches) to `module`.
+
+    Shared by ViTAdapterUNETRHead and ResNetFPNHead so both end in exactly the same head;
+    attribute names are fixed (cls_stem/cls_head/off_stem/off_head) so state-dict keys
+    of existing checkpoints are unchanged.
+    """
+    # AA: two 3×3 conv stems (spatial context) before final 1×1 prediction heads
+    module.cls_stem = nn.Sequential(
+        nn.Conv3d(ch, ch, kernel_size=3, padding=1), nn.SiLU(inplace=True), nn.InstanceNorm3d(ch),
+        nn.Conv3d(ch, ch, kernel_size=3, padding=1), nn.SiLU(inplace=True), nn.InstanceNorm3d(ch),
+    )
+    module.cls_head = nn.Conv3d(ch, num_classes, kernel_size=1)  # raw logits
+    module.off_stem = nn.Sequential(
+        nn.Conv3d(ch, ch, kernel_size=3, padding=1), nn.SiLU(inplace=True), nn.InstanceNorm3d(ch),
+        nn.Conv3d(ch, ch, kernel_size=3, padding=1), nn.SiLU(inplace=True), nn.InstanceNorm3d(ch),
+    )
+    module.off_head = nn.Conv3d(ch, 3, kernel_size=1)  # (Δx, Δy, Δz) — channel 0 = first axis (X), matches anchors_for_offsets_feature_map
+    # AA: init: cls biased toward background; offsets start at zero
+    nn.init.zeros_(module.cls_head.weight); nn.init.constant_(module.cls_head.bias, -4)
+    nn.init.zeros_(module.off_head.weight); nn.init.zeros_(module.off_head.bias)
+
+
+def _detection_outputs(module, feat):
+    """feat [B, ch, D/2, H/2, W/2] -> (cls_map [B, C, ...] logits, off_map [B, 3, ...] in [-2, 2])."""
+    cls_map = module.cls_head(module.cls_stem(feat))
+    off_map = module.off_head(module.off_stem(feat)).tanh() * 2
+    return cls_map, off_map
+
+
 def _pretrain_size_from(vit_model, fallback):
     """Side length whose //16 grid matches the ViT's pos_embed token count.
 
@@ -324,21 +356,7 @@ class ViTAdapterUNETRHead(nn.Module):
         #     self.out_ds3 = UnetOutBlock(spatial_dims=3, in_channels=self.feature_size*4, out_channels=num_classes)  # H/8
 
         # AA: detection heads tapped at dec0 (H/2, feature_size channels)
-        # AA: two 3×3 conv stems (spatial context) before final 1×1 prediction heads
-        _ch = self.feature_size
-        self.cls_stem = nn.Sequential(
-            nn.Conv3d(_ch, _ch, kernel_size=3, padding=1), nn.SiLU(inplace=True), nn.InstanceNorm3d(_ch),
-            nn.Conv3d(_ch, _ch, kernel_size=3, padding=1), nn.SiLU(inplace=True), nn.InstanceNorm3d(_ch),
-        )
-        self.cls_head = nn.Conv3d(_ch, num_classes, kernel_size=1)  # raw logits
-        self.off_stem = nn.Sequential(
-            nn.Conv3d(_ch, _ch, kernel_size=3, padding=1), nn.SiLU(inplace=True), nn.InstanceNorm3d(_ch),
-            nn.Conv3d(_ch, _ch, kernel_size=3, padding=1), nn.SiLU(inplace=True), nn.InstanceNorm3d(_ch),
-        )
-        self.off_head = nn.Conv3d(_ch, 3, kernel_size=1)  # (Δx, Δy, Δz) — channel 0 = first axis (X), matches anchors_for_offsets_feature_map
-        # AA: init: cls biased toward background; offsets start at zero
-        nn.init.zeros_(self.cls_head.weight); nn.init.constant_(self.cls_head.bias, -4)
-        nn.init.zeros_(self.off_head.weight); nn.init.zeros_(self.off_head.bias)
+        _add_detection_heads(self, self.feature_size, num_classes)
 
     def forward(self, x_in):
 
@@ -358,6 +376,42 @@ class ViTAdapterUNETRHead(nn.Module):
         # AA: if self.deep_supervision and self.training:
         # AA:     return [self.out(out), self.out_ds1(dec0), self.out_ds2(dec1), self.out_ds3(dec2)]
         # AA: return self.out(out)
-        cls_map = self.cls_head(self.cls_stem(dec0))               # [B, C,  D/2, H/2, W/2]
-        off_map = self.off_head(self.off_stem(dec0)).tanh() * 2    # [B, 3,  D/2, H/2, W/2]
-        return cls_map, off_map
+        return _detection_outputs(self, dec0)                      # [B, C, D/2, H/2, W/2], [B, 3, ...]
+
+
+class ResNetFPNHead(nn.Module):
+    """MONAI ResNet34-FPN backbone (trained from scratch) + the same dense detection head.
+
+    Same-loss CNN baseline for ViTAdapterUNETRHead: identical cls/offset head at stride 2,
+    trained by the same object_detection_loss and decoded/evaluated by the same code, so
+    the backbone is the only difference. conv1 stride 2 with no max-pool puts layer1 at
+    stride 2 (layer2..4 at 4, 8, 16); the FPN fuses them top-down and its stride-2 level
+    feeds the head with feature_size=32 channels, as ViTAdapterUNETR's dec0 does.
+    """
+
+    def __init__(self, input_channels, image_size, num_classes, autocast_ctx, feature_size=32):  # noqa: ARG002
+        super().__init__()
+        self.autocast_ctx = autocast_ctx
+        backbone = resnet34(spatial_dims=3, n_input_channels=input_channels,
+                            conv1_t_stride=2, no_max_pool=True, pretrained=False)
+        # BackboneWithFPN's IntermediateLayerGetter runs the backbone's children in order and
+        # ignores no_max_pool, so the max-pool must be removed explicitly — otherwise the
+        # head lands at stride 4 while the loss/decoder assume stride 2.
+        backbone.maxpool = nn.Identity()
+        self.feature_model = BackboneWithFPN(
+            backbone,
+            return_layers={'layer1': '0', 'layer2': '1', 'layer3': '2', 'layer4': '3'},
+            in_channels_list=[64, 128, 256, 512],
+            out_channels=feature_size,
+            spatial_dims=3,
+        )
+        _add_detection_heads(self, feature_size, num_classes)
+
+    def forward(self, x_in):
+        with self.autocast_ctx():
+            feat = self.feature_model(x_in)['0']                   # stride-2 FPN level
+            # loss/decoder hard-code stride 2; a mismatch would silently misplace every detection
+            assert tuple(feat.shape[-3:]) == tuple(s // 2 for s in x_in.shape[-3:]), \
+                f"ResNetFPN feature map {tuple(feat.shape[-3:])} is not stride 2 of input {tuple(x_in.shape[-3:])}"
+            cls_map, off_map = _detection_outputs(self, feat)
+        return cls_map.float(), off_map.float()                    # loss/decode in fp32
