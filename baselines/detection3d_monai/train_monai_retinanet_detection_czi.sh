@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=220G
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/projects/bwanggroup/reza/projects/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Baseline: MONAI RetinaNet 3D (ResNet-FPN, from scratch) — DETECTION (CZI)
@@ -32,7 +32,13 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryodino
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+# NOT $0/BASH_SOURCE: sbatch copies this script to a per-job spool dir on the compute node
+# (/localscratch/spool/slurmd/job<ID>/), so deriving the kit path from it finds nothing — same
+# gotcha documented in baselines/deepetpicker_kit/README.md. detection3d_monai.py itself
+# self-locates the repo root (walks up looking for 3DINO/ + preprocessing/), so it no longer
+# needs PYTHONPATH=. or to run from inside 3DINO/ — we only need its own absolute path here.
+BASELINES_DIR="${BASELINES_DIR:-/cluster/home/t139212uhn/scripts/cryoet/CryoDINO/baselines}"
+SCRIPT_DIR="$BASELINES_DIR/detection3d_monai"
 
 # =========================
 # Paths
@@ -70,7 +76,7 @@ echo "Datalist: $DATALIST"
 echo "Output directory: $OUTPUT_DIR"
 echo "=============================================="
 
-OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python dinov2/eval/detection3d_monai.py \
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 python "$SCRIPT_DIR/detection3d_monai.py" \
   --datalist "$DATALIST" \
   --images-dir "$IMAGES_DIR" \
   --annotations-csv "$ANNOTATIONS_CSV" \

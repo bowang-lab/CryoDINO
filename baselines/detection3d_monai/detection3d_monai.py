@@ -19,8 +19,8 @@
 # (= tensor dims 0, 1, 2). Boxes are MONAI "xyzxyz" in the same axis order; a particle
 # of radius r (Å) becomes a cube of side 2 * r / voxel_size * box_scale.
 #
-# Usage (from CryoDINO/3DINO):
-#   PYTHONPATH=. python dinov2/eval/detection3d_monai.py --output-dir /path/to/out
+# Usage (from anywhere — repo root is located automatically, see _find_repo_root below):
+#   python baselines/detection3d_monai/detection3d_monai.py --output-dir /path/to/out
 
 import argparse
 import heapq
@@ -29,6 +29,33 @@ import os
 import random
 import sys
 from functools import partial
+
+
+def _find_repo_root(start):
+    """Walk upward from `start` until a directory containing both 3DINO/ and
+    preprocessing/ is found — i.e. the CryoDINO repo root.
+
+    This script lives under baselines/detection3d_monai/, not under 3DINO/ itself (unlike
+    detection3d.py), so it cannot assume a fixed number of ".." hops to the repo root — that
+    broke once already when the file moved. Searching upward for the two sibling dirs it
+    actually needs is robust to any future relocation.
+    """
+    d = os.path.abspath(start)
+    while True:
+        if os.path.isdir(os.path.join(d, "3DINO")) and os.path.isdir(os.path.join(d, "preprocessing")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            raise RuntimeError(
+                f"Could not locate the CryoDINO repo root (a directory containing both "
+                f"3DINO/ and preprocessing/) above {start}"
+            )
+        d = parent
+
+
+_REPO_ROOT = _find_repo_root(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "3DINO"))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "preprocessing"))
 
 import numpy as np
 import torch
@@ -45,9 +72,6 @@ from monai.transforms import Compose, MapTransform, ScaleIntensityRangePercentil
 
 from dinov2.eval.detection_3d.augmentations import INTENDED_SCALE_FACTORS, make_transforms
 from dinov2.eval.detection_3d.metrics import get_metric
-
-_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))  # CryoDINO/
-sys.path.insert(0, os.path.join(_REPO_ROOT, "preprocessing"))
 from downstream_patch_generation import load_detection_annotations  # noqa: E402
 
 _DATA_ROOT = "/mnt/pool/datasets/CY/cryodino"
