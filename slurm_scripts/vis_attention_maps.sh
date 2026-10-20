@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J 3dino-vis-attn-maps
-#SBATCH -p gpu_bwanggroup
+#SBATCH -p gpu_pmccaiteam
 #SBATCH -t 1-00:00:00
-#SBATCH --account=bwanggroup_gpu
+#SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -34,9 +34,9 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
 # Fixed parameters
 # =========================
 CONFIG="dinov2/configs/train/vit3d_highres.yaml"
-WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
-IMG_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/attention_maps/imgs"
-OUT_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/attention_maps/vis_output"
+WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+IMG_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/imgs"
+OUT_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/vis_output"
 IMAGE_SIZE=112
 
 SAMPLES=("TS_0001_0000" "TS_0009_0000" "TS_027_0000")

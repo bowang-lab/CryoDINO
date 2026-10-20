@@ -21,9 +21,9 @@
 #   PYTHONPATH=. python ../baselines/train.py \
 #       --model_name unet \                         # or "unetr"
 #       --dataset_name Dataset001_CZII_10001_patches512 \
-#       --base_data_dir /cluster/projects/bwanggroup/reza/projects/cryoet/experiments \
-#       --output_dir /cluster/projects/bwanggroup/reza/projects/cryoet/experiments/baselines/unet_Dataset001 \
-#       --cache_dir /cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream/baseline_Dataset001 \
+#       --base_data_dir /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments \
+#       --output_dir /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines/unet_Dataset001 \
+#       --cache_dir /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream/baseline_Dataset001 \
 #       --image_size 112 \
 #       --epochs 100 \
 #       --epoch_length 300 \

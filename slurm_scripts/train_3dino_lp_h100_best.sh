@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J cryodino_lp-h100-best
-#SBATCH -p gpu_pmcc_ai_team
+#SBATCH -p gpu_pmccaiteam
 #SBATCH -t 7-00:00:00
-#SBATCH --account=pmcc_ai_team_gpu
+#SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -32,7 +32,7 @@ conda activate cryodino
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
-EXP="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+EXP="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 CONFIG_FILE="dinov2/configs/train/vit3d_highres_112.yaml"
 PRETRAINED_WEIGHTS="${EXP}/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
 IMAGE_SIZE=112

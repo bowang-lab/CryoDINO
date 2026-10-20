@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J cryodino_lp-ds989
-#SBATCH -p gpu_pmcc_ai_team
+#SBATCH -p gpu_pmccaiteam
 #SBATCH -t 7-00:00:00
-#SBATCH --account=pmcc_ai_team_gpu
+#SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1

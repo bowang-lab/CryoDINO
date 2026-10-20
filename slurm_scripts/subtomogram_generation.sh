@@ -2,7 +2,7 @@
 #SBATCH -J subtomogram-generation
 #SBATCH -p veryhimem
 #SBATCH -t 1-00:00:00
-#SBATCH --account=bwanggroup
+#SBATCH --account=pmccaiteam
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
@@ -21,17 +21,17 @@ conda activate cryoet
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/preprocessing
 
 # python subtomograms_generation.py \
-#   -i /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10442_imagesTr \
-#   -o /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10442_imagesTr_subtomograms \
-#   -m /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
+#   -i /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/10442_imagesTr \
+#   -o /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/10442_imagesTr_subtomograms \
+#   -m /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
 
 # python subtomograms_generation.py \
-#   -i /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10443_imagesTr \
-#   -o /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10443_imagesTr_subtomograms \
-#   -m /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
+#   -i /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/10443_imagesTr \
+#   -o /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/10443_imagesTr_subtomograms \
+#   -m /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
 
-NEW_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/upload/nifti_unannotated_10476_10479_10493_06232026"
-SUBTOMO_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/nifti_unannotated_10476_10479_10493_06232026_subtomograms"
+NEW_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/upload/nifti_unannotated_10476_10479_10493_06232026"
+SUBTOMO_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/nifti_unannotated_10476_10479_10493_06232026_subtomograms"
 
 python subtomograms_generation.py \
   -i "${NEW_BASE}/10476/imagesTr" \

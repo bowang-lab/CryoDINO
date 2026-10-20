@@ -9,8 +9,8 @@ reference lines. Also writes a CSV summary.
 
 Usage (run on the cluster login node — no GPU needed):
     python visualization/plot_lp_comparison.py \
-        --base-dir /cluster/projects/bwanggroup/reza/projects/cryoet/experiments/linear_probing_h100_b200_comparison \
-        --out-dir  /cluster/projects/bwanggroup/reza/projects/cryoet/experiments/linear_probing_h100_b200_comparison/plots
+        --base-dir /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/linear_probing_h100_b200_comparison \
+        --out-dir  /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/linear_probing_h100_b200_comparison/plots
 """
 
 import argparse

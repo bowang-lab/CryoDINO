@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J cryodino_3dino-ft-b200-128-6249-j3-newaug
-#SBATCH -p gpu_pmcc_ai_team
+#SBATCH -p gpu_pmccaiteam
 #SBATCH -t 2-00:00:00
-#SBATCH --account=pmcc_ai_team_gpu
+#SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -33,7 +33,7 @@ conda activate cryodino
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 DATASET_NAME="Dataset989_EMPIAR_10989_transposed_patches512"
 NUM_CLASSES=2
 INFER_DS_NAME="Dataset989_EMPIAR_10989_transposed"
@@ -42,8 +42,8 @@ INFER_DS_NAME="Dataset989_EMPIAR_10989_transposed"
 # Fixed training parameters
 # =========================
 CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res_128/eval/training_6249/teacher_checkpoint.pth"
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/finetuning"
+PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res_128/eval/training_6249/teacher_checkpoint.pth"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
 DATASET_PERCENT=100
 SEGMENTATION_HEAD="ViTAdapterUNETR"
 EPOCHS=100
@@ -54,7 +54,7 @@ IMAGE_SIZE=128
 BATCH_SIZE=2
 NUM_WORKERS=16
 LEARNING_RATE=1e-4
-CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0
 OVERLAP=0.75
 

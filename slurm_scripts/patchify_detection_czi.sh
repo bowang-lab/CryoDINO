@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J patchify-detection-czi
-#SBATCH -p gpu_bwanggroup
+#SBATCH -p gpu_pmccaiteam
 #SBATCH -t 4:00:00
-#SBATCH --account=bwanggroup_gpu
+#SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -31,8 +31,8 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
 # =========================
 # Paths
 # =========================
-DETECTION_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection"
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+DETECTION_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 
 # Raw CZI detection dataset (image NIfTIs + CSV point annotations + split datalist)
 CZI_SPLIT_DATALIST="${DETECTION_BASE}/czi_dataset/Dataset440_CZII_10440/czi_split_datalist.json"
@@ -40,9 +40,9 @@ CZI_CSV="${DETECTION_BASE}/czi_dataset/Dataset440_CZII_10440/point_annotations.c
 
 # Detection patch output (overlapping 128^3 patches + datalist named for loaders.py)
 PATCH_OUTPUT_DIR="${DETECTION_BASE}/Dataset440_CZII_10440_detection_patches_128"
-#PATCH_OUTPUT_DIR="/cluster/projects/bwanggroup/sumin/Dataset440_CZII_10440_detection_patches_128"
+#PATCH_OUTPUT_DIR="/cluster/projects/pmccaiteam/sumin/Dataset440_CZII_10440_detection_patches_128"
 # loaders.py make_detection_dataset_3d reads "{base-data-dir}/{dataset_name}_100_datalist.json"
-#OUTPUT_JSON="/cluster/projects/bwanggroup/sumin/cryoet/experiments/czi_100_datalist.json"
+#OUTPUT_JSON="/cluster/projects/pmccaiteam/sumin/cryoet/experiments/czi_100_datalist.json"
 OUTPUT_JSON="${PATCH_OUTPUT_DIR}/czi_100_datalist.json"
 
 # CZI 6-class sigma map (particle radius in Angstroms → sigma_vox = radius / voxel_size)

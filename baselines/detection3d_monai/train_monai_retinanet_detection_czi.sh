@@ -1,14 +1,14 @@
 #!/bin/bash
 #SBATCH -J monai-retinanet-detection-czi
-#SBATCH -p gpu_pmcc_ai_team
+#SBATCH -p gpu_pmccaiteam
 #SBATCH -t 3-00:00:00
-#SBATCH --account=pmcc_ai_team_gpu
+#SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=220G
-#SBATCH --output=/cluster/projects/bwanggroup/reza/projects/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Baseline: MONAI RetinaNet 3D (ResNet-FPN, from scratch) — DETECTION (CZI)
@@ -43,12 +43,12 @@ SCRIPT_DIR="$BASELINES_DIR/detection3d_monai"
 # =========================
 # Paths
 # =========================
-DATA_ROOT="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection"
+DATA_ROOT="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
 DATALIST="${DATA_ROOT}/Dataset440_CZII_10440_detection_patches_128/honest-split_datalist.json"
 IMAGES_DIR="${DATA_ROOT}/Dataset440_CZII_10440/imagesTr"
 ANNOTATIONS_CSV="${DATA_ROOT}/Dataset440_CZII_10440/point_annotations.csv"
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/finetuning_detection"
-CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/cache_dir_downstream_detection"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/finetuning_detection"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/cache_dir_downstream_detection"
 
 # =========================
 # Fixed Parameters

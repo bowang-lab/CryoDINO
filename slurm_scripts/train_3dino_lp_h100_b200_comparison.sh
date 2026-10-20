@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J cryodino_3dino-lp-h100-b200-cmp
-#SBATCH -p gpu_pmcc_ai_team
+#SBATCH -p gpu_pmccaiteam
 #SBATCH -t 7-00:00:00
-#SBATCH --account=pmcc_ai_team_gpu
+#SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -39,7 +39,7 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 CONFIG_DEFAULT="dinov2/configs/ssl3d_default_config.yaml"       # global_crops_size 96
 CONFIG_HIGHRES_112="dinov2/configs/train/vit3d_highres_112.yaml" # global_crops_size 112
 CONFIG_HIGHRES="dinov2/configs/train/vit3d_highres.yaml"        # global_crops_size 128
-EXP="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+EXP="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 
 # Runs:  label | run_dir | config | image_size | ckpt_iter (optional)
 # ckpt_iter: if set, use ONLY eval/training_<iter>/teacher_checkpoint.pth; if empty,

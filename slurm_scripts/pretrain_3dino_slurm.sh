@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J ssl-3dino-pretrain-high_res_b200
-#SBATCH -p gpu_pmcc_ai_team
+#SBATCH -p gpu_pmccaiteam
 #SBATCH -t 7-00:00:00
-#SBATCH --account=pmcc_ai_team_gpu
+#SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks=1
@@ -33,10 +33,10 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 CONFIG_FILE="dinov2/configs/ssl3d_default_config.yaml"
 CONFIG_FILE_HIGH_RES="dinov2/configs/train/vit3d_highres.yaml"
-OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_b200"
-OUTPUT_DIR_HIGH_REZ="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res"
-OUTPUT_DIR_HIGH_REZ_128="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res_128"
-CACHE_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir"
+OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200"
+OUTPUT_DIR_HIGH_REZ="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res"
+OUTPUT_DIR_HIGH_REZ_128="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res_128"
+CACHE_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir"
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR_HIGH_REZ"

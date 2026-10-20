@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J 3dino-ft-random-init-patches-512
-#SBATCH -p gpu_bwanggroup
+#SBATCH -p gpu_pmccaiteam
 #SBATCH -t 6-00:00:00
-#SBATCH --account=bwanggroup_gpu
+#SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -34,9 +34,9 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
 # =========================
 CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
 PRETRAINED_WEIGHTS=""   # empty = random initialization
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/finetuning"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
 DATASET_PERCENT=100
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 SEGMENTATION_HEAD="ViTAdapterUNETR"
 EPOCHS=100
 EPOCH_LENGTH=300
@@ -46,7 +46,7 @@ IMAGE_SIZE=112
 BATCH_SIZE=2
 NUM_WORKERS=7
 LEARNING_RATE=1e-4
-CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0
 OVERLAP=0.75
 

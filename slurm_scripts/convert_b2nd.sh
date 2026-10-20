@@ -2,7 +2,7 @@
 #SBATCH -J convert_b2nd
 #SBATCH -p veryhimem
 #SBATCH -t 1-00:00:00
-#SBATCH --account=bwanggroup
+#SBATCH --account=pmccaiteam
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
@@ -21,10 +21,10 @@ conda activate cryoet
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/dataset/downstream
 
 python convert_to_b2nd.py \
-  /cluster/projects/bwanggroup/reza/projects/cryoet/experiments/Dataset001_CZII_10001_100_datalist.json
+  /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset001_CZII_10001_100_datalist.json
 
 python convert_to_b2nd.py \
-  /cluster/projects/bwanggroup/reza/projects/cryoet/experiments/Dataset010_CZII_10010_100_datalist.json
+  /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset010_CZII_10010_100_datalist.json
 
 python convert_to_b2nd.py \
-  /cluster/projects/bwanggroup/reza/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_100_datalist.json
+  /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_100_datalist.json
