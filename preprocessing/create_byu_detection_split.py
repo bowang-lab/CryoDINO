@@ -8,6 +8,9 @@ downstream_patch_generation.py --detection:
        via SimpleITK, so nibabel loads the volume as (X, Y, Z) and the patcher's
        CSV (z, y, x) → (x, y, z) reorder lines up.
      - No-motor rows (coords = -1) are dropped.
+     - Sanity check: each NIfTI header shape must equal the CSV's
+       (Array shape axis 2, axis 1, axis 0); a mismatch means the volume axes
+       don't match the motor coordinates and the script aborts.
 
   2. byu_split_datalist.json  {"training", "validation", "test"}
      - Split at tomogram level, stratified by motor count bin (0 / 1 / 2+):
@@ -31,6 +34,8 @@ import random
 from collections import Counter, defaultdict
 from pathlib import Path
 
+import nibabel as nib
+
 PARTICLE_NAME = "motor"
 
 
@@ -47,12 +52,40 @@ def load_labels(labels_csv: Path) -> dict:
             info = tomos.setdefault(tomo_id, {
                 "voxel_size": float(row["Voxel spacing"]),
                 "num_motors": int(row["Number of motors"]),
+                "shape_zyx":  tuple(int(row[f"Array shape (axis {i})"]) for i in range(3)),
                 "points":     [],
             })
             z, y, x = (float(row[f"Motor axis {i}"]) for i in range(3))
             if min(z, y, x) >= 0:
                 info["points"].append((z, y, x))
     return tomos
+
+
+def run_name(nii_path: Path) -> str:
+    """'tomo_00e463_0000.nii.gz' → 'tomo_00e463' (same rule as downstream_patch_generation.run_name_from_nii)."""
+    base = nii_path.name.replace(".nii.gz", "").replace(".nii", "")
+    if "_" in base and base[-5] == "_" and base[-4:].isdigit():
+        base = base[:-5]
+    return base
+
+
+def find_images(images_dir: Path) -> dict:
+    """Map tomo_id → NIfTI path; accepts both <tomo_id>.nii.gz and nnU-Net <tomo_id>_0000.nii.gz."""
+    return {run_name(p): p.resolve()
+            for p in sorted(images_dir.glob("*.nii*")) if not p.name.startswith("._")}
+
+
+def check_shapes(image_paths: dict, tomos: dict):
+    """NIfTI (X, Y, Z) must equal CSV (axis 2, axis 1, axis 0), else coords won't line up."""
+    bad = []
+    for tomo_id, path in sorted(image_paths.items()):
+        shape = tuple(nib.load(str(path)).shape[:3])
+        expected = tomos[tomo_id]["shape_zyx"][::-1]
+        if shape != expected:
+            bad.append(tomo_id)
+            print(f"SHAPE MISMATCH {tomo_id}: nifti={shape} expected (X,Y,Z)={expected}")
+    if bad:
+        raise ValueError(f"{len(bad)}/{len(image_paths)} NIfTIs have unexpected axis order/shape")
 
 
 def stratified_split(tomo_ids: list, tomos: dict, fractions: tuple, seed: int) -> tuple:
@@ -97,7 +130,7 @@ def print_distribution(splits: dict, tomos: dict):
 def main():
     parser = argparse.ArgumentParser(description="BYU motor-count-stratified split + point annotations CSV.")
     parser.add_argument("--labels-csv", type=Path, required=True, help="Kaggle train_labels.csv")
-    parser.add_argument("--images-dir", type=Path, required=True, help="Directory of <tomo_id>.nii.gz")
+    parser.add_argument("--images-dir", type=Path, required=True, help="Directory of <tomo_id>[_0000].nii.gz")
     parser.add_argument("--output-dir", type=Path, required=True, help="Where to write the CSV and split JSON")
     parser.add_argument("--train", type=float, default=70, help="Train %% (default: 70)")
     parser.add_argument("--val",   type=float, default=15, help="Val %% (default: 15)")
@@ -111,15 +144,20 @@ def main():
 
     tomos = load_labels(args.labels_csv)
 
+    found = find_images(args.images_dir)
     image_paths = {}
     for tomo_id in tomos:
-        img_path = args.images_dir / f"{tomo_id}.nii.gz"
-        if img_path.exists():
-            image_paths[tomo_id] = img_path.resolve()
+        if tomo_id in found:
+            image_paths[tomo_id] = found[tomo_id]
         else:
             print(f"WARNING: no NIfTI for {tomo_id}, skipping")
+    for extra in sorted(set(found) - set(tomos)):
+        print(f"WARNING: {found[extra].name} not in train_labels.csv, skipping")
     if not image_paths:
         raise ValueError(f"No NIfTI files matched train_labels.csv in {args.images_dir}")
+    print(f"Matched {len(image_paths)}/{len(tomos)} tomograms in {args.images_dir}")
+
+    check_shapes(image_paths, tomos)
 
     train, val, test = stratified_split(
         list(image_paths), tomos, (args.train / 100, args.val / 100), args.seed

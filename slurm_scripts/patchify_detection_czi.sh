@@ -16,6 +16,8 @@
 # Detection patch generation (CZI)
 # Runs downstream_patch_generation.py in --detection mode:
 #   CSV point annotations → overlapping 128^3 .pt patches + czi_100_datalist.json
+# then create_detection_percent_datalists.py → nested tomogram-level 10% / 50%
+#   training subsets in czi_{10,50}percent/czi_100_datalist.json
 # Run this before train_3dino_ft_h100_detection_czi.sh
 # =========================
 
@@ -31,8 +33,8 @@ cd /cluster/home/t129616uhn/projects/CryoDINO || exit 1
 # =========================
 # Paths
 # =========================
-DETECTION_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection"
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+DETECTION_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 
 # Raw CZI detection dataset (image NIfTIs + CSV point annotations + split datalist)
 CZI_SPLIT_DATALIST="${DETECTION_BASE}/czi_dataset/Dataset440_CZII_10440/czi_split_datalist.json"
@@ -49,6 +51,7 @@ OUTPUT_JSON="${PATCH_OUTPUT_DIR}/czi_100_datalist.json"
 CZI_SIGMAS_ANG='{"Beta-amylase":65,"Beta-galactosidase":90,"Thyroglobulin":130,"cytosolic ribosome":150,"ferritin complex":60,"virus-like capsid":135}'
 
 PATCH_SIZE=128
+SEED=42
 
 echo "=============================================="
 echo "Generating detection patches (CZI)"
@@ -61,7 +64,7 @@ echo "=============================================="
 rm -rf "$PATCH_OUTPUT_DIR"
 mkdir -p "$(dirname "$OUTPUT_JSON")"
 
-python preprocessing/downstream_patch_generation.py \
+python -u preprocessing/downstream_patch_generation.py \
     --detection \
     --zscore \
     --patch-size "$PATCH_SIZE" \
@@ -71,7 +74,19 @@ python preprocessing/downstream_patch_generation.py \
     --output-json   "$OUTPUT_JSON" \
     --sigmas-ang    "$CZI_SIGMAS_ANG"
 
+echo "=============================================="
+echo "10% / 50% tomogram-level training subsets (CZI)"
+echo "=============================================="
+
+python -u preprocessing/create_detection_percent_datalists.py \
+    --dataset-name czi \
+    --split-datalist "$CZI_SPLIT_DATALIST" \
+    --patch-datalist "$OUTPUT_JSON" \
+    --percents 10 50 \
+    --seed "$SEED"
+
 echo "Patchification complete."
 echo "  Patches : $PATCH_OUTPUT_DIR"
 echo "  Datalist: $OUTPUT_JSON"
+echo "  Subsets : ${PATCH_OUTPUT_DIR}/czi_{10,50}percent/czi_100_datalist.json"
 date

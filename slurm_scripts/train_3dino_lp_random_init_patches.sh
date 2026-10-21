@@ -33,9 +33,9 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
 # =========================
 CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
 PRETRAINED_WEIGHTS=""
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/linear_probing"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/linear_probing"
 DATASET_PERCENT=100
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 SEGMENTATION_HEAD="Linear"
 EPOCHS=100
 EPOCH_LENGTH=125
@@ -45,7 +45,7 @@ IMAGE_SIZE=112
 BATCH_SIZE=2
 NUM_WORKERS=8
 LEARNING_RATE=0.001
-CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0
 
 mkdir -p "$BASE_OUTPUT_DIR"

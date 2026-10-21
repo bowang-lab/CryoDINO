@@ -26,8 +26,8 @@ conda activate cryoet
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
 
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
-DATASETS_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+DATASETS_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream"
 
 AUG_DS="Dataset989_EMPIAR_10989_transposed_patches512"
 AUG_INPUT="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
@@ -64,8 +64,8 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 # Fixed training parameters
 # =========================
 CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/finetuning"
+PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
 DATASET_PERCENT=100
 SEGMENTATION_HEAD="ViTAdapterUNETR"
 EPOCHS=100
@@ -76,7 +76,7 @@ IMAGE_SIZE=112
 BATCH_SIZE=2
 NUM_WORKERS=10
 LEARNING_RATE=1e-4
-CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0
 OVERLAP=0.75
 

@@ -35,9 +35,9 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
 
 CONFIG_FILE="dinov2/configs/ssl3d_default_config.yaml"
 CONFIG_FILE_HIGH_RES="dinov2/configs/train/vit3d_highres.yaml"
-OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_01_h100"
-OUTPUT_DIR_HIGH_REZ="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res"
-CACHE_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir"
+OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_01_h100"
+OUTPUT_DIR_HIGH_REZ="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res"
+CACHE_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir"
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR_HIGH_REZ"

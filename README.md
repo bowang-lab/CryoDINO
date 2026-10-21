@@ -85,14 +85,14 @@ conda activate cryoet
  salloc -c 16 -t 10:0:0 --mem 240G --gres=gpu:1 --partition=gpu_bwanggroup --account=bwanggroup_gpu
 srun --jobid=6716412 --overlap --pty bash
 
-sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/bwanggroup/reza/
+sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/pmccaiteam/reza/
 projects/cryoet /home/sumin/uhn-data
 (t129616uhn@h4huhndata1.uhnresearch.ca) Password:
-sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/bwanggroup/reza/projects/cryoet /home/sumin/uhn-data
-sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/bwanggroup/reza/
+sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/pmccaiteam/reza/projects/cryoet /home/sumin/uhn-data
+sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/pmccaiteam/reza/
 projects/cryoet /home/sumin/uhn-data
 (t129616uhn@h4huhndata1.uhnresearch.ca) Password:
-sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/bwanggroup/reza/
+sumin@LAPTOP-9MQRRA63:~/uhn-home/projects/CryoDINO$ sshfs t129616uhn@h4huhndata1.uhnresearch.ca:/cluster/projects/pmccaiteam/reza/
 projects/cryoet /home/sumin/uhn-data
 
 ```bash

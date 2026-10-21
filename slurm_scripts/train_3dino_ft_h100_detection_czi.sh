@@ -43,9 +43,9 @@ cd /cluster/home/t129616uhn/projects/CryoDINO/3DINO || exit 1
 # =========================
 # Paths
 # =========================
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection/Dataset440_CZII_10440_detection_patches_128"
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/finetuning_detection"
-CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/cache_dir_downstream_detection"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection/Dataset440_CZII_10440_detection_patches_128"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/finetuning_detection"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/cache_dir_downstream_detection"
 
 # loaders.py make_detection_dataset_3d reads "{base-data-dir}/{dataset_name}_100_datalist.json"
 OUTPUT_JSON="${BASE_DATA_DIR}/czi_100_datalist.json"
@@ -58,7 +58,7 @@ mkdir -p "$BASE_OUTPUT_DIR"
 # Fixed Parameters
 # =========================
 CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
 DATASET_NAME="czi"            # loaders.py: czi → 6 classes (byu → 1)
 DATASET_PERCENT=100
 SEGMENTATION_HEAD="ViTAdapterUNETR"

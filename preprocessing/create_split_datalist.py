@@ -1,11 +1,11 @@
 """Create train/val/test split datalist JSON for an nnUNet-style dataset.
   cd projects/CryoDINO
   python preprocessing/create_split_datalist.py \
-      /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection/czi_dataset/Dataset440_CZII_10440 \
+      /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection/czi_dataset/Dataset440_CZII_10440 \
       --detection \
-      --val-dir  /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection/czi_dataset/Dataset445_CZII_10445 \
-      --test-dir /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection/czi_dataset/Dataset446_CZII_10446 \
-      --output   /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection/czi_dataset/Dataset440_CZII_10440/czi_split_datalist.json
+      --val-dir  /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection/czi_dataset/Dataset445_CZII_10445 \
+      --test-dir /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection/czi_dataset/Dataset446_CZII_10446 \
+      --output   /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection/czi_dataset/Dataset440_CZII_10440/czi_split_datalist.json
 
 
 Adapted from CryoET/dataset/downstream/create_datalist.py.

@@ -24,9 +24,9 @@ conda activate cryoet
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoET || exit 1
 
 CONFIG_FILE="3DINO/dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
-FINETUNING_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/finetuning"
-DATALIST_FILE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
+PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+FINETUNING_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
+DATALIST_FILE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
 DATASET_NAME="Dataset989_EMPIAR_10989_transposed"
 NUM_CLASSES=2
 IMAGE_SIZE=112

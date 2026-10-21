@@ -27,13 +27,13 @@ conda activate cryoet
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
 
 pretrained_weights_paths=(
-    "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100/eval/training_37499/teacher_checkpoint.pth"
-    "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100/eval/training_24999/teacher_checkpoint.pth"
-    "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100/eval/training_12499/teacher_checkpoint.pth"
-    "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_3124/teacher_checkpoint.pth"
-    "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_6249/teacher_checkpoint.pth"
-    "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
-    "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_12499/teacher_checkpoint.pth"
+    "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100/eval/training_37499/teacher_checkpoint.pth"
+    "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100/eval/training_24999/teacher_checkpoint.pth"
+    "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100/eval/training_12499/teacher_checkpoint.pth"
+    "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_3124/teacher_checkpoint.pth"
+    "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_6249/teacher_checkpoint.pth"
+    "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+    "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_12499/teacher_checkpoint.pth"
 )
 
 downstream_datasets=(
@@ -47,9 +47,9 @@ downstream_datasets=(
 # =========================
 CONFIG_DEFAULT="dinov2/configs/ssl3d_default_config.yaml"
 CONFIG_HIGHRES="dinov2/configs/train/vit3d_highres.yaml"
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/linear_probing"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/linear_probing"
 DATASET_PERCENT=100
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 SEGMENTATION_HEAD="Linear"
 EPOCHS=100
 EPOCH_LENGTH=125
@@ -58,7 +58,7 @@ WARMUP_ITERS=3000
 BATCH_SIZE=2
 NUM_WORKERS=7
 LEARNING_RATE=0.001
-CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0
 
 mkdir -p "$CACHE_DIR_BASE"

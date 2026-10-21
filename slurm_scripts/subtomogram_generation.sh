@@ -21,11 +21,11 @@ conda activate cryoet
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/preprocessing
 
 python subtomograms_generation.py \
-  -i /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10442_imagesTr \
-  -o /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10442_imagesTr_subtomograms \
-  -m /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
+  -i /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/10442_imagesTr \
+  -o /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/10442_imagesTr_subtomograms \
+  -m /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
 
 python subtomograms_generation.py \
-  -i /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10443_imagesTr \
-  -o /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/10443_imagesTr_subtomograms \
-  -m /cluster/projects/bwanggroup/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv
+  -i /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/10443_imagesTr \
+  -o /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/10443_imagesTr_subtomograms \
+  -m /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/otsu_masks/otsu_deconv

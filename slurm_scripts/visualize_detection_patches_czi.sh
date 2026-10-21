@@ -32,7 +32,7 @@ cd /cluster/home/t129616uhn/projects/CryoDINO || exit 1
 # =========================
 #OUTPUT_JSON="/cluster/projects/bwanggroup/sumin/cryoet/experiments/czi_100_datalist.json"
 #VIS_OUTPUT_DIR="/cluster/projects/bwanggroup/sumin/cryoet/czi_detection_patch_vis"
-DETECTION_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection"
+DETECTION_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
 PATCH_OUTPUT_DIR="${DETECTION_BASE}/Dataset440_CZII_10440_detection_patches_128"
 #PATCH_OUTPUT_DIR="/cluster/projects/bwanggroup/sumin/Dataset440_CZII_10440_detection_patches_128"
 # loaders.py make_detection_dataset_3d reads "{base-data-dir}/{dataset_name}_100_datalist.json"

@@ -41,16 +41,16 @@ cd /cluster/home/t129616uhn/projects/CryoDINO/3DINO || exit 1
 # =========================
 # Paths
 # =========================
-DETECTION_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection"
+DETECTION_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
 CZI_DATASET_DIR="${DETECTION_BASE}/czi_dataset"
 BASE_DATA_DIR="${DETECTION_BASE}/Dataset440_CZII_10440_detection_patches_128"   # only for model-arg parity
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/finetuning_detection"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/finetuning_detection"
 
 # =========================
 # Fixed Parameters (must match training)
 # =========================
 CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
 DATASET_NAME="czi"            # czi → 6 classes
 DATASET_PERCENT=100
 SEGMENTATION_HEAD="ViTAdapterUNETR"

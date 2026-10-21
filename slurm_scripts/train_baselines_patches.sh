@@ -27,9 +27,9 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryoet
 
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
-CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
-OUTPUT_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/baselines"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream"
+OUTPUT_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines"
 IMAGE_SIZE=112
 BATCH_SIZE=2
 

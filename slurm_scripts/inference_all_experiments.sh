@@ -34,9 +34,9 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoET || exit 1
 # Fixed Parameters
 # =========================
 CONFIG_FILE="3DINO/dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
-FINETUNING_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/finetuning"
-DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+FINETUNING_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
+DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 IMAGE_SIZE=112
 BATCH_SIZE=2       # keep low to leave headroom for CPU-side metric computation
 OVERLAP=0.75

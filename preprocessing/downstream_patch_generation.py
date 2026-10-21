@@ -163,7 +163,9 @@ def main_detection(args):
 
     For each training tomogram:
       1. Load NIfTI with nibabel → XYZ order (axis 0=X, axis 2=Z)
-      2. Z-score normalize full volume
+      2. Z-score normalize full volume (--zscore), or keep the NIfTI's on-disk dtype
+         (--native-dtype, e.g. uint8 BYU: 4x smaller; the train-time per-crop
+         percentile rescale makes the model input identical either way)
       3. Sliding-window overlapping patches (stride = patch_size // 2)
       4. Per patch: subtract patch offset → local XYZ coords, then filter with
          get_points_mask_within_patch  (Kaggle functional.py get_points_mask_within_cube)
@@ -180,6 +182,8 @@ def main_detection(args):
     print("Detection mode")
     print(f"  Patch size : {patch_size}³  stride={stride}")
     print(f"  Sigmas (Å) : {sigmas_ang}  default={default_sigma_ang}")
+    print(f"  Storage    : {'native NIfTI dtype' if args.native_dtype else 'float32'}"
+          f"{'  (zscore)' if args.zscore else ''}")
 
     # Load annotations from CSV
     print("\nLoading annotations...")
@@ -204,11 +208,14 @@ def main_detection(args):
         print(f"\n[{run}]  {nii_path}")
 
         # Load NIfTI with nibabel → XYZ: shape (X, Y, Z)
-        volume = nib.load(nii_path).get_fdata().astype(np.float32)
+        if args.native_dtype:
+            volume = np.asanyarray(nib.load(nii_path).dataobj)
+        else:
+            volume = nib.load(nii_path).get_fdata().astype(np.float32)
         if args.zscore:
             volume = zscore_normalize(volume)
         X, Y, Z = volume.shape
-        print(f"  shape={volume.shape}  min={volume.min():.2f} max={volume.max():.2f}")
+        print(f"  shape={volume.shape}  dtype={volume.dtype}  min={volume.min():.2f} max={volume.max():.2f}")
 
         run_info = annotations.get(run, {'points': [], 'voxel_size': entry.get('voxel_size', 10.0)})
         vs       = float(run_info['voxel_size'])
@@ -367,12 +374,16 @@ def main():
                         help='[Detection] JSON string mapping particle_name→radius_Å, e.g. \'{"ferritin complex": 60}\'')
     parser.add_argument('--default-sigma-ang', type=float, default=0.0,
                         help='[Detection] Fallback sigma in Å for particles not in --sigmas-ang (default: 0.0)')
+    parser.add_argument('--native-dtype', action='store_true',
+                        help='[Detection] Save patches in the NIfTI on-disk dtype (e.g. uint8) without normalization')
     args = parser.parse_args()
 
     # Route to detection mode
     if args.detection:
         if not args.csv:
             parser.error('--detection requires --csv')
+        if args.native_dtype and args.zscore:
+            parser.error('--native-dtype stores raw intensities; drop --zscore')
         main_detection(args)
         return
 

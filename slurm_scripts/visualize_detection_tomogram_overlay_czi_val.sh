@@ -32,7 +32,7 @@ cd /cluster/home/t129616uhn/projects/CryoDINO || exit 1
 # =========================
 # Paths
 # =========================
-DETECTION_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream_detection"
+DETECTION_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
 
 IMAGES_DIR="${DETECTION_BASE}/czi_dataset/Dataset445_CZII_10445/imagesTr"
 CZI_CSV="${DETECTION_BASE}/czi_dataset/Dataset445_CZII_10445/point_annotations.csv"

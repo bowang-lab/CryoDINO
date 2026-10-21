@@ -32,16 +32,16 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
 # Re-generate patches (all patches, no fg threshold, with zscore)
 # =========================
 # PATCH_DATALISTS=(
-#     # "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/Dataset001_CZII_10001_100_datalist.json"
-#     # "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/Dataset010_CZII_10010_100_datalist.json"
-#     # "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_100_datalist.json"
-#     "/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/Dataset049_EMPIAR_12049_transposed_100_datalist.json"
+#     # "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset001_CZII_10001_100_datalist.json"
+#     # "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset010_CZII_10010_100_datalist.json"
+#     # "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_100_datalist.json"
+#     "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset049_EMPIAR_12049_transposed_100_datalist.json"
 # )
 # PATCH_OUTPUT_DIRS=(
-#     # "/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream/Dataset001_CZII_10001_train_patches_512"
-#     # "/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream/Dataset010_CZII_10010_train_patches_512"
-#     # "/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream/Dataset989_EMPIAR_10989_transposed_train_patches_512"
-#     "/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream/Dataset049_EMPIAR_12049_transposed_train_patches_512"
+#     # "/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream/Dataset001_CZII_10001_train_patches_512"
+#     # "/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream/Dataset010_CZII_10010_train_patches_512"
+#     # "/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream/Dataset989_EMPIAR_10989_transposed_train_patches_512"
+#     "/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream/Dataset049_EMPIAR_12049_transposed_train_patches_512"
 # )
 
 # for i in "${!PATCH_DATALISTS[@]}"; do
@@ -70,8 +70,8 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
 # =========================
 # Augment patches for class balance (all datasets)
 # =========================
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
-DATASETS_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+DATASETS_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream"
 
 declare -A AUG_INPUT_DATALISTS
 AUG_INPUT_DATALISTS["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist.json"
@@ -145,10 +145,10 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 # Fixed Parameters
 # =========================
 CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/finetuning"
+PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
 DATASET_PERCENT=100
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 SEGMENTATION_HEAD="ViTAdapterUNETR"
 EPOCHS=100
 EPOCH_LENGTH=300
@@ -158,7 +158,7 @@ IMAGE_SIZE=112
 BATCH_SIZE=2
 NUM_WORKERS=10
 LEARNING_RATE=1e-4
-CACHE_DIR_BASE="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0
 OVERLAP=0.75
 

@@ -31,9 +31,9 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
 # =========================
 # Generate patches from training tomogram (00004_0000)
 # =========================
-RAW_DATALIST="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_swapped_100_datalist.json"
-PATCH_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream/Dataset989_EMPIAR_10989_transposed_swapped_train_patches_512"
-PATCHES_DATALIST="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_swapped_patches512_100_datalist.json"
+RAW_DATALIST="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_swapped_100_datalist.json"
+PATCH_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream/Dataset989_EMPIAR_10989_transposed_swapped_train_patches_512"
+PATCHES_DATALIST="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_swapped_patches512_100_datalist.json"
 
 echo "=============================================="
 echo "Generating patches from 00004_0000 (swapped train)..."
@@ -55,9 +55,9 @@ echo "Patch generation complete: $PATCHES_DATALIST"
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
-BASE_OUTPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/finetuning"
-BASE_DATA_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments"
+PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 DATASET_NAME="Dataset989_EMPIAR_10989_transposed_swapped_patches512"
 SEGMENTATION_HEAD="ViTAdapterUNETR"
 EPOCHS=100
@@ -74,7 +74,7 @@ OVERLAP=0.75
 NUM_CLASSES=2
 
 OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_pretrain_aug"
-CACHE_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/cache_dir_downstream/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
+CACHE_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$CACHE_DIR"
