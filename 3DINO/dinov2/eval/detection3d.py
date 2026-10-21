@@ -490,6 +490,7 @@ def do_finetune(feature_model, autocast_dtype, args):
     # val_dice_list = []
     # val_per_cls_dice_list = []
     best_val_f4    = -1.0
+    best_val_thr   = None        # thresholds of the best-val checkpoint, reused on test
     top5_heap      = []          # min-heap (f4, iter, ckpt_path) — keeps top-5 checkpoints
     train_loss_sum = 0
     train_loss_count = 0
@@ -613,6 +614,7 @@ def do_finetune(feature_model, autocast_dtype, args):
 
             if best_f4 > best_val_f4:
                 best_val_f4 = best_f4
+                best_val_thr = best_thr
                 print(f"New best Val F4: {best_val_f4:.4f} at iter {it}", flush=True)
                 torch.save(seg_model.state_dict(), os.path.join(args.output_dir, "best_model.pth"))
 
@@ -666,10 +668,14 @@ def do_finetune(feature_model, autocast_dtype, args):
             )
             clear_cuda_memory()
 
-    test_f4, test_thr, test_per_cls = test_metric.threshold_sweep()
-    print(f"Test F4: {test_f4:.4f}", flush=True)
-    print(f"Test per-class F4: {test_per_cls}", flush=True)
-    print(f"Test per-class thresholds: {test_thr}", flush=True)
+    # Test is scored at the thresholds chosen on val for the best checkpoint; no sweep on test,
+    # which would tune thresholds on the test set itself and inflate F4
+    if best_val_thr is None:
+        raise RuntimeError("No validation run before test: best_val_thr is unset (eval_iters > total iters?)")
+    test_f4, test_per_cls = test_metric.f4_at_thresholds(best_val_thr)
+    print(f"Test F4 @ val thresholds: {test_f4:.4f}", flush=True)
+    print(f"Test per-class F4 @ val thresholds: {test_per_cls}", flush=True)
+    print(f"Val-selected thresholds: {best_val_thr}", flush=True)
 
     # AA: old segmentation results JSON:
     # with open(f'{args.output_dir}/results.json', 'w') as fp:
@@ -688,7 +694,9 @@ def do_finetune(feature_model, autocast_dtype, args):
             'val_f4_list':         val_f4_list,
             'val_per_cls_f4_list': val_per_cls_f4_list,
             'test_f4':             float(test_f4),
-            'test_per_cls_f4':     {k: float(v) for k, v in test_per_cls.items()},
+            'test_per_cls_f4':     {k: float(v) for k, v in test_per_cls.items()},   # at val thresholds
+            'best_val_f4':         float(best_val_f4),
+            'best_val_thresholds': best_val_thr,
         }, fp)
 
 

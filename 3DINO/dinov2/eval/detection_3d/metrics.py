@@ -220,6 +220,22 @@ class CZIDetectionMetrics:
 
         return best_f4, best_cls_thr, best_cls_f4
 
+    def f4_at_thresholds(self, cls_thresholds: dict):
+        """Aggregate F4 with fixed per-class thresholds (e.g. chosen on val), no sweep.
+
+        Returns:
+            agg_f4     : float — weighted aggregate
+            per_cls_f4 : dict {particle_name: f4 at that class's threshold}
+        """
+        per_cls_f4 = {}
+        for name in self.PARTICLE_NAMES:
+            _, per_class = self._f4_at_threshold(float(cls_thresholds[name]))
+            per_cls_f4[name] = per_class[name]
+        weighted_sum = sum(per_cls_f4[name] * w for name, w in zip(self.PARTICLE_NAMES, self.WEIGHTS))
+        total_weight = sum(self.WEIGHTS)
+        agg_f4 = weighted_sum / total_weight if total_weight > 0 else 0.0
+        return agg_f4, per_cls_f4
+
     def reset(self):
         self._data = []
 
@@ -329,6 +345,13 @@ class BYUDetectionMetrics:
             if fbeta > best_fbeta:
                 best_fbeta, best_thr, best_per_class = fbeta, float(thr), per_class
         return best_fbeta, best_thr, best_per_class
+
+    def f4_at_thresholds(self, threshold: float):
+        """F-beta at a fixed global threshold (e.g. chosen on val), no sweep.
+
+        Same name as CZIDetectionMetrics.f4_at_thresholds; BYU has one class, so one float threshold.
+        """
+        return self._fbeta_at_threshold(float(threshold))
 
     def reset(self):
         self._data = []
