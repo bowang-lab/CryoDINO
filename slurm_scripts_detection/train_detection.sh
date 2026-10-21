@@ -38,8 +38,10 @@ date
 hostname
 nvidia-smi
 
+set +u   # /etc/bashrc and conda's activate scripts read unset variables
 source ~/.bashrc
 conda activate cryoet
+set -u
 
 cd /cluster/home/t129616uhn/projects/CryoDINO/3DINO || exit 1
 
