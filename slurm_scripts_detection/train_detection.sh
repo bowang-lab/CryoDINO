@@ -38,10 +38,19 @@ date
 hostname
 nvidia-smi
 
+# cryoet has torch 2.1 (cu121), which has no sm_100 kernels. On B200 nodes a venv layered on
+# cryoet (--system-site-packages) supplies torch 2.7.1 cu128 + xformers 0.0.31; every other
+# package still comes from cryoet. A100/H100 use cryoet as is.
+B200_VENV="/cluster/projects/pmccaiteam/sumin/envs/cryoet-b200"
+
 set +u   # /etc/bashrc and conda's activate scripts read unset variables
 source ~/.bashrc
 conda activate cryoet
+if nvidia-smi --query-gpu=name --format=csv,noheader | grep -q B200; then
+  source "$B200_VENV/bin/activate"
+fi
 set -u
+echo "Python env: $(python -c 'import sys, torch; print(sys.prefix, "torch", torch.__version__)')"
 
 cd /cluster/home/t129616uhn/projects/CryoDINO/3DINO || exit 1
 
@@ -139,6 +148,13 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python di
   --cache-dir "$CACHE_DIR" \
   --resize-scale "$RESIZE_SCALE" \
   ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}   # empty-array safe under set -u on bash < 4.4
+STATUS=$?
 
-echo "Finished: $OUTPUT_DIR (results.json)"
+if [ "$STATUS" -eq 0 ] && [ -f "$OUTPUT_DIR/results.json" ]; then
+  echo "Finished: $OUTPUT_DIR/results.json"
+else
+  echo "FAILED (exit $STATUS): no results.json in $OUTPUT_DIR"
+  [ "$STATUS" -eq 0 ] && STATUS=1
+fi
 date
+exit "$STATUS"
