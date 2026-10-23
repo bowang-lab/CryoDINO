@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=15
-#SBATCH --mem=200G
+#SBATCH --mem=500G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
@@ -81,8 +81,14 @@ DATASETS=(
 for DATASET_NAME in "${DATASETS[@]}"; do
 
     OUTPUT_DIR="${BASE_OUTPUT_DIR}/random_init_${DATASET_NAME}_vit_adapter"
-    # Reuse existing cache (same data, transforms are identical)
+    # Reuse existing cache (same data, transforms are identical). Dataset049 uses a "_merged"
+    # suffix to match the B200 CryoDINO scripts, since its _remap_12049 label remap runs in
+    # load_transforms (pre-cache) — a shared non-suffixed cache dir risks silently reusing a
+    # stale pre-remap (raw 6-class) cache.
     CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
+    if [[ "$DATASET_NAME" == *"12049"* ]]; then
+        CACHE_DIR="${CACHE_DIR}_merged"
+    fi
 
     mkdir -p "$CACHE_DIR"
     mkdir -p "$OUTPUT_DIR"
