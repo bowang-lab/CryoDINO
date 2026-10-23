@@ -32,7 +32,7 @@ cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 # =========================
 # Fixed Parameters
 # =========================
-CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
+CONFIG_FILE="dinov2/configs/train/vit3d_highres_112.yaml"
 PRETRAINED_WEIGHTS=""   # empty = random initialization
 BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
 DATASET_PERCENT=100
