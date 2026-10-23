@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-random-init-patches-512
+#SBATCH -J cryodino-3dino-ft-random-init-patches-512
 #SBATCH -p gpu_pmccaiteam
 #SBATCH -t 6-00:00:00
 #SBATCH --account=pmccaiteam_gpu
