@@ -82,7 +82,7 @@ for MODEL in "${MODELS[@]}"; do
         echo "  Cache   : ${CACHE_DIR} (shared with 100% run)"
         echo "=================================================="
 
-        OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python ../baselines/train.py \
+        OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python ../baselines/unet_unetr/train.py \
             --model_name "${MODEL}" \
             --dataset_name "${DATASET_NAME}" \
             --base_data_dir "${BASE_DATA_DIR}" \
@@ -116,7 +116,7 @@ for MODEL in "${MODELS[@]}"; do
             echo "Output:     $INFER_OUTPUT_DIR"
             echo "----------------------------------------------"
 
-            OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python ../baselines/inference.py \
+            OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python ../baselines/unet_unetr/inference.py \
               --model-name "$MODEL" \
               --checkpoint "$CHECKPOINT" \
               --image-size "$IMAGE_SIZE" \
