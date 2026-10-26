@@ -1,0 +1,137 @@
+#!/bin/bash
+#SBATCH -J cryodino-baseline-50pct
+#SBATCH -p gpu_pmccaiteam
+#SBATCH -t 6-00:00:00
+#SBATCH --account=pmccaiteam_gpu
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=24
+#SBATCH --mem=220G
+#SBATCH --mail-user=attarpour1993@gmail.com
+#SBATCH --mail-type=ALL
+#SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
+
+# =========================
+# Baseline training: UNet and UNETR from random initialization, 50% training data
+# All 4 datasets, 100% data run already done (baselines/{unet,unetr}_Dataset{...}/results.json)
+# Runs sequentially: unet x 4 datasets -> unetr x 4 datasets (8 runs total)
+# Pre-built "<base>_50percent_100_datalist.json" files carry the training subset
+# (val/test = full 100% set), same convention as the CryoDINO 10pct/50pct scripts
+# and train_3dino_ft_h100_highres_9374_patches_50pct.sh.
+# Submit: sbatch train_baselines_patches_50pct.sh
+# =========================
+
+date
+hostname
+pwd
+nvidia-smi
+
+source ~/.bashrc
+conda activate cryodino
+
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream"
+OUTPUT_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines"
+IMAGE_SIZE=112
+BATCH_SIZE=2
+DATASET_PERCENT=100
+
+# Inference parameters — keyed by base dataset name (no percent suffix); test set is
+# always the full 100% datalist regardless of training percent.
+declare -A DATALIST
+DATALIST["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist.json"
+DATALIST["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist.json"
+DATALIST["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
+DATALIST["Dataset049_EMPIAR_12049_transposed_patches512"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist.json"
+
+declare -A NUM_CLASSES
+NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
+NUM_CLASSES["Dataset010_CZII_10010_patches512"]=2
+NUM_CLASSES["Dataset989_EMPIAR_10989_transposed_patches512"]=2
+NUM_CLASSES["Dataset049_EMPIAR_12049_transposed_patches512"]=4
+
+CACHE_DATASETS=(
+    "Dataset001_CZII_10001_patches512"
+    "Dataset010_CZII_10010_patches512"
+    "Dataset989_EMPIAR_10989_transposed_patches512"
+    "Dataset049_EMPIAR_12049_transposed_patches512"
+)
+MODELS=("unet" "unetr")
+
+cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+
+for MODEL in "${MODELS[@]}"; do
+    for CACHE_DATASET in "${CACHE_DATASETS[@]}"; do
+
+        DATASET_NAME="${CACHE_DATASET}_50percent"
+
+        CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${CACHE_DATASET}"
+        if [[ "$CACHE_DATASET" == *"12049"* ]]; then
+            CACHE_DIR="${CACHE_DIR}_merged"
+        fi
+        OUTPUT_DIR="${OUTPUT_BASE}/${MODEL}_${DATASET_NAME}"
+
+        mkdir -p "$OUTPUT_DIR"
+        mkdir -p "$CACHE_DIR"
+
+        echo "=================================================="
+        echo "  Model   : ${MODEL}"
+        echo "  Dataset : ${DATASET_NAME}"
+        echo "  Output  : ${OUTPUT_DIR}"
+        echo "  Cache   : ${CACHE_DIR} (shared with 100% run)"
+        echo "=================================================="
+
+        OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python ../baselines/train.py \
+            --model_name "${MODEL}" \
+            --dataset_name "${DATASET_NAME}" \
+            --base_data_dir "${BASE_DATA_DIR}" \
+            --output_dir "${OUTPUT_DIR}" \
+            --cache_dir "${CACHE_DIR}" \
+            --image_size "$IMAGE_SIZE" \
+            --epochs 100 \
+            --epoch_length 300 \
+            --eval_iters 600 \
+            --warmup_iters 3000 \
+            --learning_rate 1e-4 \
+            --batch_size "$BATCH_SIZE" \
+            --num_workers 10 \
+            --dataset_percent "$DATASET_PERCENT"
+
+        echo "Finished training: $OUTPUT_DIR"
+
+        # =========================
+        # Inference on test set immediately after training
+        # =========================
+        CHECKPOINT="${OUTPUT_DIR}/best_model.pth"
+        INFER_OUTPUT_DIR="${OUTPUT_DIR}/inference"
+        mkdir -p "$INFER_OUTPUT_DIR"
+
+        if [ ! -f "$CHECKPOINT" ]; then
+            echo "  [SKIP inference] checkpoint not found: $CHECKPOINT"
+        else
+            echo "----------------------------------------------"
+            echo "Running inference: ${MODEL} on ${DATASET_NAME}"
+            echo "Checkpoint: $CHECKPOINT"
+            echo "Output:     $INFER_OUTPUT_DIR"
+            echo "----------------------------------------------"
+
+            OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python ../baselines/inference.py \
+              --model-name "$MODEL" \
+              --checkpoint "$CHECKPOINT" \
+              --image-size "$IMAGE_SIZE" \
+              --num-classes "${NUM_CLASSES[$CACHE_DATASET]}" \
+              --datalist "${DATALIST[$CACHE_DATASET]}" \
+              --dataset-name "$CACHE_DATASET" \
+              --output-dir "$INFER_OUTPUT_DIR" \
+              --batch-size "$BATCH_SIZE" \
+              --cpu-metrics
+
+            echo "Finished inference: $INFER_OUTPUT_DIR"
+        fi
+
+    done
+done
+
+echo "All datasets completed!"
+date
