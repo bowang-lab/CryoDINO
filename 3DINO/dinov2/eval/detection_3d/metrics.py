@@ -261,14 +261,13 @@ class BYUDetectionMetrics:
       - threshold_sweep sweeps confidence score threshold (not distance threshold).
 
     Args:
-        min_radius : matching distance threshold in Å.
-                     TODO: verify exact value from BYU competition page.
-        beta       : F-beta exponent. TODO: verify (likely 2).
+        min_radius : matching distance threshold in Å (BYU Kaggle metric: 1000 Å).
+        beta       : F-beta exponent (BYU Kaggle metric: F2).
     """
 
     PARTICLE_NAMES = ['motor']
 
-    def __init__(self, min_radius: float = 500.0, beta: float = 2.0):
+    def __init__(self, min_radius: float = 1000.0, beta: float = 2.0):
         self.min_radius = min_radius
         self.beta       = beta
         self._data      = []
