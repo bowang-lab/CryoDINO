@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=15
-#SBATCH --mem=700G
+#SBATCH --mem=800G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
@@ -72,10 +72,10 @@ INFER_DATASET_NAME["Dataset049_EMPIAR_12049_transposed_patches512"]="Dataset049_
 mkdir -p "$BASE_OUTPUT_DIR"
 
 DATASETS=(
-    "Dataset001_CZII_10001_patches512"
-    "Dataset010_CZII_10010_patches512"
-    "Dataset989_EMPIAR_10989_transposed_patches512"
-    "Dataset049_EMPIAR_12049_transposed_patches512"
+    # "Dataset001_CZII_10001_patches512"   # done (job 8014924): Overall Dice 0.8530, valid
+    # "Dataset010_CZII_10010_patches512"   # done (job 8014924): Overall Dice 0.8113, valid
+    "Dataset989_EMPIAR_10989_transposed_patches512"   # rerun: OOM'd at iter ~9000/30000
+    "Dataset049_EMPIAR_12049_transposed_patches512"   # rerun: OOM'd at iter ~13200/30000
     )
 
 for DATASET_NAME in "${DATASETS[@]}"; do
