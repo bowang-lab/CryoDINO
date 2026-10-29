@@ -10,7 +10,20 @@ Inference only -- training lives in deepict/run_datalist.sh.
 DeePiCt's prediction path is config-driven and split across three scripts, so this driver
 generates a prediction-only config and shells out to the upstream stages unchanged:
     generate_prediction_partition.py -> segment.py -> assemble_prediction.py
-It then thresholds the assembled sigmoid probability map at --threshold.
+generate_prediction_partition.py and segment.py are class-independent (the network emits every
+channel in one pass), so they run once per tomogram; assemble_prediction.py is per-class, so it
+runs once per class (same "segment once, assemble N times" pattern as deepict/predict.sh).
+
+Binary vs multi-class is inherited from --train-config's semantic_classes list (one name ->
+binary, N>1 -> multi-class) -- the same auto-detection convention as
+deepict/prepare_from_datalist.py. In binary mode the assembled sigmoid probability map is
+thresholded at --threshold, exactly as before. In multi-class mode (DeePiCt's head is multi-label:
+N independent sigmoid channels, no background channel -- see deepict/README.md's "Binary and
+multi-class"), the N probability maps are turned into one mutually-exclusive prediction by adding
+a synthetic background channel `bg = clip(1 - max(p_1..p_N), 0, 1)` and taking the argmax over
+`[bg, p_1, ..., p_N]` -- see baseline_common.py's score_mask/emit_and_score. Dataset049/EMPIAR-12049
+additionally needs --remap-12049 (merges matrix/centrioles into background before scoring, see
+baselines/deepict/datalist_utils.py's remap_12049).
 
 Environment: run in the venv built for DeePiCt/membrain, NOT the cryoet conda env:
     module load python/3.11 && source /scratch/cyyu/venvs/membrain/bin/activate
@@ -21,6 +34,15 @@ Two input modes (identical to segmentation3d_inference.py):
 
 Usage:
 
+  # binary (e.g. Dataset010)
+  python inference/deepict_inference.py \\
+    --model-path /path/to/out/model_best.pth \\
+    --train-config /path/to/the/training/config.yaml \\
+    --deepict-root /path/to/DeePiCt \\
+    --datalist /path/to/datalist.json \\
+    --output-dir /path/to/output/
+
+  # multi-class (e.g. Dataset001; add --remap-12049 for Dataset049)
   python inference/deepict_inference.py \\
     --model-path /path/to/out/model_best.pth \\
     --train-config /path/to/the/training/config.yaml \\
@@ -29,9 +51,10 @@ Usage:
     --output-dir /path/to/output/
 
 Outputs:
-  - <output-dir>/<name>.nii.gz: predicted binary mask (uint8), thresholded at --threshold
+  - <output-dir>/<name>.nii.gz: predicted label map (uint8) -- a hard binary mask in binary mode,
+    or the ordinal 0=bg/1..N=class argmax prediction in multi-class mode
   - <output-dir>/metrics.json:  per-image and overall Dice/HD95 (only when labels are available)
-  - <work-dir>/: converted .mrc inputs, metadata.csv, the generated config, DeePiCt partitions
+  - <work-dir>/: converted .mrc inputs, metadata.csv, the generated config(s), DeePiCt partitions
     and the raw probability maps (removed unless --keep-intermediates)
 """
 
@@ -53,9 +76,11 @@ from baseline_common import (  # noqa: E402
     CryoMetrics,
     emit_and_score,
     load_volume,
+    remap_12049,
     resolve_samples,
     sample_name,
     save_mrc,
+    split_classes,
     write_metrics_json,
 )
 
@@ -114,8 +139,8 @@ def get_args_parser():
                         "Required unless --predictions-dir is given.")
     p.add_argument("--predictions-dir", type=str, default=None,
                    help="Score EXISTING DeePiCt predictions instead of running the model. "
-                        "Expects <DIR>/<name>/<semantic-class>/probability_map.mrc, i.e. point it "
-                        "at .../out/predictions/<model_name>.")
+                        "Expects <DIR>/<name>/<class>/probability_map.mrc per declared class, "
+                        "i.e. point it at .../out/predictions/<model_name>.")
     p.add_argument("--output-dir", type=str, required=True,
                    help="Directory for predictions and metrics.json")
     p.add_argument("--datalist", type=str, default=None,
@@ -130,15 +155,22 @@ def get_args_parser():
                    help="Path to the DeePiCt clone (default: $DEEPICT)")
     p.add_argument("--train-config", type=str, default=None,
                    help="Config the model was trained with; box_size/overlap/semantic_classes "
-                        "are inherited from it (strongly recommended)")
+                        "are inherited from it (strongly recommended). len(semantic_classes)>1 "
+                        "switches to multi-class scoring.")
     p.add_argument("--box-size", type=int, default=None,
                    help="Partition box size; overrides --train-config (default: 64)")
     p.add_argument("--overlap", type=int, default=None,
                    help="Partition overlap; overrides --train-config (default: 12)")
     p.add_argument("--semantic-class", type=str, default=None,
-                   help="Class to predict; overrides --train-config (default: particle)")
+                   help="Force binary mode on this single class, overriding --train-config's "
+                        "(possibly multi-class) semantic_classes list.")
+    p.add_argument("--remap-12049", action="store_true",
+                   help="Dataset049/EMPIAR-12049 only: merge matrix/centrioles into background "
+                        "before scoring (matches augmentations.py's _remap_12049). Only affects "
+                        "the ground truth used for scoring; ignored in binary mode.")
     p.add_argument("--threshold", type=float, default=0.5,
-                   help="Threshold on the sigmoid probability map (default: 0.5)")
+                   help="Binary mode only: threshold on the sigmoid probability map (default: "
+                        "0.5). Multi-class mode uses argmax instead (see module docstring).")
     p.add_argument("--work-dir", type=str, default=None,
                    help="Scratch dir for .mrc inputs, partitions and probability maps "
                         "(default: <output-dir>/_deepict_work)")
@@ -149,11 +181,13 @@ def get_args_parser():
     return p
 
 
-def build_dataset(samples, data_dir):
-    """Materialize each sample as the .mrc trio DeePiCt expects; return metadata rows.
+def build_dataset(samples, data_dir, class_names, class_values, remap=False):
+    """Materialize each sample as the .mrc tomogram + region + one mask per class.
 
-    Ported from deepict/prepare_from_datalist.py::convert_entries. The region mask column is
-    NOT optional: generate_prediction_partition.py and segment.py index it unconditionally.
+    Ported from deepict/prepare_from_datalist.py::convert_entries, generalized the same way:
+    `class_values` is None in binary mode (single 'particle' mask, old behaviour unchanged);
+    otherwise one binary mask file is written per class value. The region mask column is NOT
+    optional: generate_prediction_partition.py and segment.py index it unconditionally.
     """
     raw_d, msk_d = os.path.join(data_dir, "raw"), os.path.join(data_dir, "masks")
     os.makedirs(raw_d, exist_ok=True)
@@ -162,11 +196,8 @@ def build_dataset(samples, data_dir):
     for i, (img_path, label_path) in enumerate(samples, 1):
         name = sample_name(img_path, label_path)
         raw_p = os.path.join(raw_d, name + ".mrc")
-        part_p = os.path.join(msk_d, name + "_particle.mrc")
         reg_p = os.path.join(msk_d, name + "_region.mrc")
 
-        # A full tomogram is ~1 GB as float32, so hold as few copies as possible and write the
-        # two masks as int8 -- DeePiCt itself defaults the region mask to np.ones(dtype=int8).
         img = load_volume(img_path)
         shape = img.shape
         save_mrc(img, raw_p)
@@ -174,24 +205,36 @@ def build_dataset(samples, data_dir):
         del img
         save_mrc(region, reg_p, dtype=np.int8)
         del region
-        # The particle mask is only read during training/evaluation; write the label when we
-        # have one and an empty volume otherwise, so the CSV column is always populated.
-        particle = binarize(load_volume(label_path)) if label_path else np.zeros(shape, np.uint8)
-        save_mrc(particle, part_p, dtype=np.int8)
-        del particle
 
-        rows.append((name, raw_p, reg_p, part_p))
+        lab = None
+        if label_path:
+            lab = load_volume(label_path)
+            if remap:
+                lab = remap_12049(lab)
+        if class_values is None:
+            masks = [binarize(lab) if lab is not None else np.zeros(shape, np.uint8)]
+        else:
+            masks = (split_classes(lab, class_values) if lab is not None
+                    else [np.zeros(shape, np.uint8) for _ in class_values])
+        mask_ps = []
+        for cname, m in zip(class_names, masks):
+            p = os.path.join(msk_d, f"{name}_{cname}.mrc")
+            save_mrc(m, p, dtype=np.int8)
+            mask_ps.append(p)
+        del masks
+
+        rows.append(tuple([name, raw_p, reg_p] + mask_ps))
         shapes[name] = shape
         print(f"  [{i}/{len(samples)}] {name:32s} shape={shape}", flush=True)
     return rows, shapes
 
 
-def write_config(args, rows, work_dir, class_name, box_size, overlap):
+def write_config(args, rows, work_dir, class_names, box_size, overlap):
     cfg = copy.deepcopy(CONFIG_SKELETON)
     meta = os.path.join(work_dir, "data", "metadata.csv")
     with open(meta, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["tomo_name", "tomo", "lamella_file", "particle_mask"])
+        w.writerow(["tomo_name", "tomo", "lamella_file"] + [f"{n}_mask" for n in class_names])
         w.writerows(rows)
 
     cfg["dataset_table"] = meta
@@ -202,16 +245,30 @@ def write_config(args, rows, work_dir, class_name, box_size, overlap):
     cfg["tomos_sets"]["training_list"] = []
     cfg["tomos_sets"]["prediction_list"] = [r[0] for r in rows]
     cfg["training"]["active"] = False
-    cfg["training"]["semantic_classes"] = [class_name]
+    cfg["training"]["semantic_classes"] = class_names
     cfg["training"]["box_size"] = box_size
     cfg["training"]["overlap"] = overlap
     cfg["prediction"]["active"] = True
-    cfg["prediction"]["semantic_class"] = class_name
+    # In binary mode this is the one class predict reads. In multi-class mode
+    # assemble_prediction.py only ever reads one channel per call, so the main loop below writes
+    # a per-class override of this same config (same trick as deepict/predict.sh's
+    # .predict_<class>.yaml) rather than relying on this default.
+    cfg["prediction"]["semantic_class"] = class_names[0]
 
     cfg_path = os.path.join(work_dir, "config.yaml")
     with open(cfg_path, "w") as f:
         yaml.safe_dump(cfg, f, sort_keys=False)
     return cfg_path, cfg
+
+
+def write_class_config(cfg_path, class_name, out_path):
+    """Copy cfg_path with prediction.semantic_class overridden -- assemble_prediction.py takes
+    only --config_file, so each class needs its own config to select that channel."""
+    cfg = yaml.safe_load(open(cfg_path))
+    cfg["prediction"]["semantic_class"] = class_name
+    with open(out_path, "w") as f:
+        yaml.safe_dump(cfg, f, sort_keys=False)
+    return out_path
 
 
 def run_stage(script, src, cfg_path, name, cwd):
@@ -258,31 +315,38 @@ def main():
 
     # box_size / overlap must match training (they drive partitioning and reassembly); the
     # network shape does not, since segment.py reads it from checkpoint['model_descriptor'].
-    box_size, overlap, class_name = 64, 12, "particle"
+    box_size, overlap, class_names = 64, 12, ["particle"]
     if args.train_config:
         tc = yaml.safe_load(open(args.train_config))["training"]
         box_size, overlap = tc["box_size"], tc["overlap"]
-        class_name = tc["semantic_classes"][0]
+        class_names = list(tc["semantic_classes"])
         print(f"Inherited from {args.train_config}: box_size={box_size} overlap={overlap} "
-              f"class={class_name}")
+              f"classes={class_names}")
     box_size = args.box_size or box_size
     overlap = args.overlap if args.overlap is not None else overlap
-    class_name = args.semantic_class or class_name
+    if args.semantic_class:
+        class_names = [args.semantic_class]
+    multiclass = len(class_names) > 1
+    class_values = list(range(1, len(class_names) + 1)) if multiclass else None
+    if args.remap_12049 and not multiclass:
+        print("Warning: --remap-12049 has no effect in binary mode (GT is binarized instead).")
 
     os.makedirs(args.output_dir, exist_ok=True)
     work_dir = os.path.abspath(args.work_dir or os.path.join(args.output_dir, "_deepict_work"))
 
     samples = resolve_samples(args.datalist, args.input_dir, args.label_dir, args.split)
     has_any_labels = any(lbl for _, lbl in samples)
-    metric = CryoMetrics(num_classes=2) if has_any_labels else None
+    metric = CryoMetrics(num_classes=len(class_names) + 1) if has_any_labels else None
     print(f"Found {len(samples)} images ({sum(1 for _, l in samples if l)} with labels)")
+    print(f"Mode: {'multi-class ' + str(class_names) if multiclass else 'binary (particle)'}")
 
     rows = shapes = cfg = cfg_path = model_name = None
     if not scoring_only:
         os.makedirs(work_dir, exist_ok=True)
         print("\n=== 1) converting inputs to DeePiCt .mrc + metadata.csv ===")
-        rows, shapes = build_dataset(samples, os.path.join(work_dir, "data"))
-        cfg_path, cfg = write_config(args, rows, work_dir, class_name, box_size, overlap)
+        rows, shapes = build_dataset(samples, os.path.join(work_dir, "data"), class_names,
+                                     class_values, remap=args.remap_12049)
+        cfg_path, cfg = write_config(args, rows, work_dir, class_names, box_size, overlap)
         print(f"config -> {cfg_path}")
         model_name = os.path.basename(args.model_path)[:-4]
 
@@ -294,7 +358,7 @@ def main():
             "source": "existing-predictions",
             "predictions_dir": os.path.abspath(args.predictions_dir),
             "threshold": args.threshold,
-            "semantic_class": class_name,
+            "semantic_classes": class_names,
         }
     else:
         provenance = {
@@ -304,7 +368,7 @@ def main():
             "threshold": args.threshold,
             "box_size": box_size,
             "overlap": overlap,
-            "semantic_class": class_name,
+            "semantic_classes": class_names,
         }
 
     print("\n=== predicting ===" if not scoring_only else "\n=== scoring existing predictions ===")
@@ -313,11 +377,18 @@ def main():
         print(f"\n[{i}/{len(samples)}] Processing: {name}")
 
         if scoring_only:
-            prob_path = os.path.join(args.predictions_dir, name, class_name, "probability_map.mrc")
-            if not os.path.isfile(prob_path):
-                raise SystemExit(f"Error: no probability map for {name} at {prob_path} "
-                                 f"-- check --predictions-dir / --semantic-class")
             expected = load_volume(img_path).shape
+            probs = []
+            for cname in class_names:
+                prob_path = os.path.join(args.predictions_dir, name, cname, "probability_map.mrc")
+                if not os.path.isfile(prob_path):
+                    raise SystemExit(f"Error: no probability map for {name}/{cname} at "
+                                     f"{prob_path} -- check --predictions-dir / --semantic-class")
+                prob = load_volume(prob_path)
+                if prob.shape != expected:
+                    raise SystemExit(f"Error: probability map shape {prob.shape} != input "
+                                     f"{expected}")
+                probs.append(prob)
         else:
             # generate_prediction_partition.py silently no-ops when the partition h5 already
             # exists, which would otherwise reuse a partition built with different settings.
@@ -325,24 +396,42 @@ def main():
             if os.path.isdir(stale):
                 shutil.rmtree(stale, ignore_errors=True)
 
-            for stage in ("generate_prediction_partition.py", "segment.py", "assemble_prediction.py"):
+            for stage in ("generate_prediction_partition.py", "segment.py"):
                 run_stage(os.path.join(scripts, stage), src, cfg_path, name, work_dir)
 
-            prob_path = os.path.join(cfg["output_dir"], "predictions", model_name, name,
-                                     class_name, "probability_map.mrc")
-            if not os.path.isfile(prob_path):
-                raise SystemExit(f"Error: DeePiCt produced no probability map at {prob_path}")
-            expected = shapes[name]
+            probs = []
+            for cname in class_names:
+                # Binary mode: cfg_path's prediction.semantic_class is already class_names[0],
+                # so this reproduces the pre-multi-class code path exactly (same config, no
+                # override file written).
+                class_cfg_path = cfg_path
+                if multiclass:
+                    class_cfg_path = os.path.join(work_dir, f".predict_{cname}.yaml")
+                    write_class_config(cfg_path, cname, class_cfg_path)
+                run_stage(os.path.join(scripts, "assemble_prediction.py"), src, class_cfg_path,
+                         name, work_dir)
+                prob_path = os.path.join(cfg["output_dir"], "predictions", model_name, name,
+                                         cname, "probability_map.mrc")
+                if not os.path.isfile(prob_path):
+                    raise SystemExit(f"Error: DeePiCt produced no probability map at {prob_path}")
+                prob = load_volume(prob_path)
+                if prob.shape != shapes[name]:
+                    raise SystemExit(f"Error: probability map shape {prob.shape} != input "
+                                     f"{shapes[name]}")
+                probs.append(prob)
 
-        prob = load_volume(prob_path)
-        if prob.shape != expected:
-            raise SystemExit(f"Error: probability map shape {prob.shape} != input {expected}")
-        pred = (prob >= args.threshold).astype(np.uint8)
-        print(f"  probability map: {prob_path}  (fg voxels at t={args.threshold}: {int(pred.sum())})")
-        del prob
+        if multiclass:
+            pred = list(probs)
+            print(f"  probability maps: classes={class_names}")
+        else:
+            pred = (probs[0] >= args.threshold).astype(np.uint8)
+            print(f"  probability map (class={class_names[0]}): fg voxels at "
+                  f"t={args.threshold}: {int(pred.sum())}")
+        del probs
 
         emit_and_score(name, img_path, label_path, pred, args.output_dir,
-                       results, metric, args.cpu_metrics, provenance)
+                       results, metric, args.cpu_metrics, provenance,
+                       remap_12049_gt=args.remap_12049)
         del pred
 
     write_metrics_json(results, args.output_dir, extra=provenance)

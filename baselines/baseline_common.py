@@ -36,6 +36,7 @@ __all__ = [
     "CryoMetrics", "clear_cuda_memory", "write_metrics_json",
     "strip_ext", "sample_name", "load_volume", "binarize", "save_mrc", "save_prediction",
     "resolve_samples", "score_mask", "record_metrics", "emit_and_score",
+    "foreground_values", "split_classes", "remap_12049",
 ]
 
 VOLUME_EXTS = (".nii.gz", ".nii", ".mrc", ".rec", ".pt", ".h5")
@@ -84,6 +85,34 @@ def binarize(label_arr):
     happens when the string "10010" appears in --dataset-name (default: "dataset").
     """
     return (np.asarray(label_arr) > 0).astype(np.uint8)
+
+
+def foreground_values(label_arr):
+    """Sorted non-zero label values present in one volume, as ints."""
+    return [int(v) for v in np.unique(label_arr) if int(v) != 0]
+
+
+def split_classes(label_arr, class_values):
+    """Multi-label volume -> one binary uint8 mask per class value, in the given order.
+
+    Copied from `baselines/deepict/datalist_utils.py` (same reasoning as the rest of this
+    module's duplicated I/O helpers: no cross-kit import).
+    """
+    return [(label_arr == v).astype(np.uint8) for v in class_values]
+
+
+def remap_12049(label_arr):
+    """Dataset049/EMPIAR-12049 raw {0..5} -> remapped {0,1,2,3}.
+
+    Matches `_remap_12049` in `3DINO/dinov2/eval/segmentation_3d/augmentations.py` and
+    `baselines/deepict/datalist_utils.py`'s copy: raw classes 1 (matrix) and 5 (centrioles)
+    merge into background, the rest renumber contiguously (2->1, 3->2, 4->3).
+    """
+    out = np.zeros_like(label_arr)
+    out[label_arr == 2] = 1
+    out[label_arr == 3] = 2
+    out[label_arr == 4] = 3
+    return out.astype(label_arr.dtype)
 
 
 def save_mrc(arr, path, dtype=np.float32):
@@ -256,22 +285,45 @@ def write_metrics_json(results, output_dir, extra=None):
 # mask -> logits bridge
 # --------------------------------------------------------------------------------------
 
-def score_mask(metric, pred_mask, gt_mask, cpu_metrics=False):
-    """Score a *binary mask* (not logits) against a binary ground truth with `metric`.
+def score_mask(metric, pred, gt_mask, cpu_metrics=False):
+    """Score a prediction (not logits) against a ground-truth label with `metric`.
 
-    The baselines emit a hard mask / a probability map, whereas CryoMetrics.__call__ expects the
-    argmax-able logit tensor CryoDINO produces. Lifting the mask to `[1 - m, m]` makes the argmax
-    reproduce the mask exactly, so the same code path -- and therefore the same numbers -- is used
-    for all three methods.
+    `CryoMetrics.__call__` expects an argmax-able, multi-channel logit tensor -- the shape
+    CryoDINO's network output naturally has. The baselines don't have that, so this lifts
+    whatever they do have into the same shape, in one of two ways:
+
+      - `pred` is a single binary mask / probability array `m` (DeePiCt-binary, membrain-seg):
+        lifted to `[1 - m, m]`, so the argmax reproduces `m` exactly.
+      - `pred` is a list of N independent per-class probability maps (DeePiCt multi-class: a
+        multi-label sigmoid head, no background channel, classes may overlap -- see
+        baselines/deepict/README.md's "Binary and multi-class"): lifted to
+        `[bg, p_1, ..., p_N]` where `bg = clip(1 - max(p_1..p_N), 0, 1)`. Each p_i is itself a
+        sigmoid output confirmed bounded in (0, 1) (DeePiCt's assemble_tomo_from_subtomos is
+        called with final_activation='sigmoid'), so the clip is defensive, not load-bearing.
+
+    Either way, the same `CryoMetrics` call computes the same numbers, so DS010 (binary) and
+    DS001/Dataset049 (multi-class) land in one comparable table.
     """
-    pred_mask = np.asarray(pred_mask)
     gt_mask = np.asarray(gt_mask)
-    if pred_mask.shape != gt_mask.shape:
-        raise ValueError(
-            f"prediction/label shape mismatch: pred {pred_mask.shape} vs label {gt_mask.shape}"
-        )
-    m = torch.as_tensor(pred_mask, dtype=torch.float32)
-    logits = torch.stack([1.0 - m, m], dim=0).unsqueeze(0)              # (1, 2, D, H, W)
+    if isinstance(pred, (list, tuple)):
+        probs = [np.asarray(p) for p in pred]
+        for p in probs:
+            if p.shape != gt_mask.shape:
+                raise ValueError(
+                    f"prediction/label shape mismatch: pred {p.shape} vs label {gt_mask.shape}"
+                )
+        stacked = np.stack(probs, axis=0)                          # (N, D, H, W)
+        bg = np.clip(1.0 - stacked.max(axis=0), 0.0, 1.0)           # (D, H, W)
+        channels = np.concatenate([bg[None], stacked], axis=0)     # (N+1, D, H, W)
+        logits = torch.as_tensor(channels, dtype=torch.float32).unsqueeze(0)  # (1, N+1, D, H, W)
+    else:
+        pred_mask = np.asarray(pred)
+        if pred_mask.shape != gt_mask.shape:
+            raise ValueError(
+                f"prediction/label shape mismatch: pred {pred_mask.shape} vs label {gt_mask.shape}"
+            )
+        m = torch.as_tensor(pred_mask, dtype=torch.float32)
+        logits = torch.stack([1.0 - m, m], dim=0).unsqueeze(0)              # (1, 2, D, H, W)
     target = torch.as_tensor(gt_mask, dtype=torch.float32)[None, None]  # (1, 1, D, H, W)
     # HD95 builds one-hot distance transforms; on a full tomogram those can exceed 10+ GiB,
     # hence the CPU escape hatch (same rationale as segmentation3d_inference.py --cpu-metrics).
@@ -280,12 +332,21 @@ def score_mask(metric, pred_mask, gt_mask, cpu_metrics=False):
     return metric(logits, target)
 
 
-def emit_and_score(name, img_path, label_path, mask, output_dir, results, metric,
-                   cpu_metrics=False, provenance=None):
-    """Save `mask` as <output_dir>/<name>.nii.gz and, when a label exists, score it into `results`.
+def emit_and_score(name, img_path, label_path, pred, output_dir, results, metric,
+                   cpu_metrics=False, provenance=None, remap_12049_gt=False):
+    """Save the prediction as <output_dir>/<name>.nii.gz and, when a label exists, score it.
 
     The common tail of every per-sample loop in both baseline scripts, in either mode (running the
     model or reading an existing prediction off disk).
+
+    `pred` is either a single hard mask (binary) or a list of N per-class probability maps
+    (multi-class, see `score_mask`). In the multi-class case, the saved volume is the real
+    prediction -- `argmax([bg, p_1, ..., p_N])`, giving an ordinal 0=bg/1..N=class label map, the
+    same shape every other method's saved prediction already has -- not a per-class probability
+    map.
+
+    `remap_12049_gt=True` applies Dataset049's background-merge remap to the loaded ground truth
+    before scoring (ignored in binary mode, where the ground truth is binarized instead).
 
     Pass `provenance` to rewrite metrics.json after every sample. Scoring a full tomogram is slow
     (HD95 runs four distance transforms over 200-450 M voxels), so a run that is cut short -- a
@@ -293,11 +354,24 @@ def emit_and_score(name, img_path, label_path, mask, output_dir, results, metric
     finished. Aggregates are recomputed from `results` on each call, so a partial file is
     internally consistent; its `overall_*` keys are simply means over fewer tomograms.
     """
+    multiclass = isinstance(pred, (list, tuple))
+    if multiclass:
+        stacked = np.stack([np.asarray(p) for p in pred], axis=0)
+        bg = np.clip(1.0 - stacked.max(axis=0), 0.0, 1.0)
+        mask = np.argmax(np.concatenate([bg[None], stacked], axis=0), axis=0).astype(np.uint8)
+    else:
+        mask = pred
+
     out_path = save_prediction(mask, img_path, os.path.join(output_dir, name + ".nii.gz"))
     print(f"  Saved prediction: {out_path}")
     if label_path:
-        gt = binarize(load_volume(label_path))
-        record_metrics(results, name, metric, mask, gt, cpu_metrics)
+        gt = load_volume(label_path)
+        if multiclass:
+            if remap_12049_gt:
+                gt = remap_12049(gt)
+        else:
+            gt = binarize(gt)
+        record_metrics(results, name, metric, pred, gt, cpu_metrics)
         del gt
         if provenance is not None:
             write_metrics_json(results, output_dir, extra=provenance)
