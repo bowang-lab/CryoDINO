@@ -10,7 +10,7 @@
 #SBATCH --mem=100G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Visualisation: PCA + MHSA for 3 representative tomograms
@@ -26,15 +26,17 @@ hostname
 nvidia-smi
 
 source ~/.bashrc
-conda activate cryoet
+conda activate cryodino
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
+cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 # =========================
-# Fixed parameters
+# Fixed parameters — B200 highres112 backbone (swap for highres128 by changing
+# CONFIG to vit3d_highres.yaml, WEIGHTS to ssl3d_run_b200_high_res_128/eval/training_6249,
+# and IMAGE_SIZE to 128)
 # =========================
-CONFIG="dinov2/configs/train/vit3d_highres.yaml"
-WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+CONFIG="dinov2/configs/train/vit3d_highres_112.yaml"
+WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res/eval/training_6249/teacher_checkpoint.pth"
 IMG_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/imgs"
 OUT_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/vis_output"
 IMAGE_SIZE=112
