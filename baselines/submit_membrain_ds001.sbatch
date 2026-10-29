@@ -61,7 +61,8 @@ python "$BASELINES_DIR/membrain_inference.py" \
   --checkpoint "$CKPT" \
   --datalist   "$OUT/test_list.json" \
   --output-dir "$OUT/cryodino_metrics" \
-  --target-class "$TARGET_CLASS"
+  --target-class "$TARGET_CLASS" \
+  --cpu-metrics
 
 echo "Done: $OUT/cryodino_metrics"
 date

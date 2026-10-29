@@ -53,7 +53,8 @@ echo "best ckpt: $CKPT"
 python "$BASELINES_DIR/membrain_inference.py" \
   --checkpoint "$CKPT" \
   --datalist   "$OUT/test_list.json" \
-  --output-dir "$OUT/cryodino_metrics"
+  --output-dir "$OUT/cryodino_metrics" \
+  --cpu-metrics
 
 echo "Done: $OUT/cryodino_metrics"
 date

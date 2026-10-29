@@ -31,9 +31,12 @@ DATALIST="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset0
 OUT="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines_out/deepict_ds001"
 mkdir -p "$OUT"
 
-EPOCHS=100 ITERS=300 DEEPICT="$DEEPICT" VENV="$VENV" \
-  CLASSES=cytoplasm,organelles,membrane \
-  bash "$KIT_DIR/run_datalist.sh" "$DATALIST" "$OUT"
+# Training already completed successfully (model_best.pth exists under $OUT/out/) -- only the
+# scoring step below failed (missing --cpu-metrics, see next section). Commented out so this
+# resubmission just reruns scoring against the existing trained model.
+# EPOCHS=100 ITERS=300 DEEPICT="$DEEPICT" VENV="$VENV" \
+#   CLASSES=cytoplasm,organelles,membrane \
+#   bash "$KIT_DIR/run_datalist.sh" "$DATALIST" "$OUT"
 
 echo "Done: $OUT"
 
@@ -49,7 +52,8 @@ python "$BASELINES_DIR/deepict_inference.py" \
   --train-config "$OUT/config.yaml" \
   --deepict-root "$DEEPICT" \
   --datalist     "$DATALIST" \
-  --output-dir   "$OUT/cryodino_metrics"
+  --output-dir   "$OUT/cryodino_metrics" \
+  --cpu-metrics
 
 echo "Done: $OUT/cryodino_metrics"
 date

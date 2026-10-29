@@ -43,7 +43,8 @@ python "$BASELINES_DIR/deepict_inference.py" \
   --deepict-root "$DEEPICT" \
   --datalist     "$DATALIST" \
   --output-dir   "$OUT/cryodino_metrics" \
-  --threshold    0.5
+  --threshold    0.5 \
+  --cpu-metrics
 
 echo "Done: $OUT/cryodino_metrics"
 date
