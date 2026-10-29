@@ -8,7 +8,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=220G
-#SBATCH --time=24:00:00
+#SBATCH --time=30:00:00
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
@@ -29,4 +29,31 @@ mkdir -p "$OUT"
 EPOCHS=100 ITERS=300 VENV="$VENV" bash "$KIT_DIR/run_datalist.sh" "$DATALIST" "$OUT"
 
 echo "Done: $OUT"
+
+echo "=== Scoring with CryoDINO-schema metrics (membrain_inference.py) ==="
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate cryodino
+source "$VENV/bin/activate"
+
+# Same best-checkpoint-by-lowest-val_loss selection as membrain_kit/run_datalist.sh, so this
+# doesn't hardcode a filename that only matches one particular training run.
+CKPT=$(python - "$OUT/checkpoints" <<'PY'
+import glob, os, re, sys
+best, bv = None, 1e9
+for f in glob.glob(os.path.join(sys.argv[1], "*.ckpt")):
+    m = re.search(r"val_loss=([0-9]+\.[0-9]+)", os.path.basename(f))
+    v = float(m.group(1)) if m else 1e9
+    if v <= bv: best, bv = f, v
+print(best or "")
+PY
+)
+[ -n "$CKPT" ] || { echo "ERROR: no checkpoint found in $OUT/checkpoints"; exit 1; }
+echo "best ckpt: $CKPT"
+
+python "$BASELINES_DIR/membrain_inference.py" \
+  --checkpoint "$CKPT" \
+  --datalist   "$OUT/test_list.json" \
+  --output-dir "$OUT/cryodino_metrics"
+
+echo "Done: $OUT/cryodino_metrics"
 date

@@ -36,7 +36,7 @@ __all__ = [
     "CryoMetrics", "clear_cuda_memory", "write_metrics_json",
     "strip_ext", "sample_name", "load_volume", "binarize", "save_mrc", "save_prediction",
     "resolve_samples", "score_mask", "record_metrics", "emit_and_score",
-    "foreground_values", "split_classes", "remap_12049",
+    "foreground_values", "split_classes", "remap_12049", "target_class",
 ]
 
 VOLUME_EXTS = (".nii.gz", ".nii", ".mrc", ".rec", ".pt", ".h5")
@@ -85,6 +85,17 @@ def binarize(label_arr):
     happens when the string "10010" appears in --dataset-name (default: "dataset").
     """
     return (np.asarray(label_arr) > 0).astype(np.uint8)
+
+
+def target_class(label_arr, value):
+    """Extract one raw label value as a binary mask (uint8), ignoring every other class.
+
+    Used to scope membrain-seg (binary-only architecture) to one specific class on a
+    multi-class dataset -- e.g. membrane-only on Dataset001 (raw value 3) or Dataset049
+    (raw value 2, pre-remap) -- instead of lumping every foreground class together via
+    `binarize`. Copied from `baselines/membrain_kit/datalist_utils.py`.
+    """
+    return (np.asarray(label_arr) == value).astype(np.uint8)
 
 
 def foreground_values(label_arr):
@@ -333,7 +344,8 @@ def score_mask(metric, pred, gt_mask, cpu_metrics=False):
 
 
 def emit_and_score(name, img_path, label_path, pred, output_dir, results, metric,
-                   cpu_metrics=False, provenance=None, remap_12049_gt=False):
+                   cpu_metrics=False, provenance=None, remap_12049_gt=False,
+                   target_class_value=None):
     """Save the prediction as <output_dir>/<name>.nii.gz and, when a label exists, score it.
 
     The common tail of every per-sample loop in both baseline scripts, in either mode (running the
@@ -346,7 +358,12 @@ def emit_and_score(name, img_path, label_path, pred, output_dir, results, metric
     map.
 
     `remap_12049_gt=True` applies Dataset049's background-merge remap to the loaded ground truth
-    before scoring (ignored in binary mode, where the ground truth is binarized instead).
+    before scoring (multi-class mode only).
+
+    `target_class_value` (binary mode only): instead of `binarize(gt)` (every class > 0 counts as
+    foreground), extract this one raw label value as the ground truth -- e.g. membrain-seg scoped
+    to membrane-only on a multi-class dataset. Mutually exclusive with `remap_12049_gt` in
+    practice (binary mode ignores the latter).
 
     Pass `provenance` to rewrite metrics.json after every sample. Scoring a full tomogram is slow
     (HD95 runs four distance transforms over 200-450 M voxels), so a run that is cut short -- a
@@ -369,6 +386,8 @@ def emit_and_score(name, img_path, label_path, pred, output_dir, results, metric
         if multiclass:
             if remap_12049_gt:
                 gt = remap_12049(gt)
+        elif target_class_value is not None:
+            gt = target_class(gt, target_class_value)
         else:
             gt = binarize(gt)
         record_metrics(results, name, metric, pred, gt, cpu_metrics)

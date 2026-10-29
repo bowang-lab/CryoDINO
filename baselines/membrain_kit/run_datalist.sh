@@ -2,6 +2,11 @@
 # End-to-end from a datalist JSON: prepare -> train -> infer on test -> save per-sample output.
 #
 # Usage:  [EPOCHS=100 ITERS=300 VENV=/path/venv] bash run_datalist.sh <datalist.json> <out_dir>
+#
+# membrain-seg has no multi-class head, so a multi-class dataset needs scoping to one class via
+# --target-class rather than the default generic binarize(label>0):
+#   TARGET_CLASS=3 bash run_datalist.sh data001.json out/   # Dataset001: membrane is raw value 3
+#   TARGET_CLASS=2 bash run_datalist.sh data049.json out/   # Dataset049: membranes is raw value 2
 set -euo pipefail
 DATALIST="${1:?usage: bash run_datalist.sh <datalist.json> <out_dir>}"
 OUT="${2:?usage: bash run_datalist.sh <datalist.json> <out_dir>}"
@@ -9,6 +14,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${VENV:=$HERE/venv}"
 : "${EPOCHS:=100}"
 : "${ITERS:=300}"
+: "${TARGET_CLASS:=}"
 
 [ -f "$VENV/bin/activate" ] || { echo "ERROR: venv not found at $VENV — build it (see README) or set VENV=."; exit 1; }
 module load python/3.11 2>/dev/null || true
@@ -17,8 +23,10 @@ mkdir -p "$OUT"
 nvidia-smi -L 2>/dev/null || echo "(no GPU visible — training/inference need one)"
 
 echo "=== 1) prepare data_dir + test list from datalist ==="
+PREP_ARGS=()
+[ -n "$TARGET_CLASS" ] && PREP_ARGS+=(--target-class "$TARGET_CLASS")
 python "$HERE/prepare_from_datalist.py" --datalist "$DATALIST" \
-    --data-dir "$OUT/data_dir" --test-out "$OUT/test_list.json"
+    --data-dir "$OUT/data_dir" --test-out "$OUT/test_list.json" "${PREP_ARGS[@]+"${PREP_ARGS[@]}"}"
 
 echo "=== 2) train ($EPOCHS epochs x $ITERS iters/epoch) ==="
 python "$HERE/train_membrain.py" --data-dir "$OUT/data_dir" \
