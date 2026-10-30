@@ -110,7 +110,8 @@ EVAL_ITERS=1200
 WARMUP_ITERS=3000
 IMAGE_SIZE=128                # must match the 128^3 patch size for detection
 BATCH_SIZE=4
-NUM_WORKERS=24               # of 32 CPUs: loader workers (OMP=1 each); rest for the main process
+NUM_WORKERS="${NUM_WORKERS:-24}"   # of 32 CPUs: loader workers (OMP=1 each); rest for the main process.
+                                  # Override with --export=...,NUM_WORKERS=8 when submitting with less --mem/--cpus-per-task
 LEARNING_RATE=1e-4
 RESIZE_SCALE=1.0
 
