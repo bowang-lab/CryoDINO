@@ -6,18 +6,23 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=24
-#SBATCH --mem=440G
+#SBATCH --mem=800G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # TEMPORARY rerun script -- delete after use.
-# Dataset001 (unet + unetr, 10% and 50%) kept hitting --mem=220G OOM in both
-# train_baselines_patches_10pct.sh and _50pct.sh (all 4 combos invalid: truncated
-# training, and unetr/50pct's inference process was also OOM-killed outright).
-# Bumped to --mem=440G here (2x the failing 220G), scoped to just the 4 broken runs,
-# so we don't have to re-run the 6 already-valid combos in each job.
+# Dataset001 (unet + unetr, 10% and 50%) kept hitting the memory limit in
+# train_baselines_patches_10pct.sh and _50pct.sh.
+# Round 1 (--mem=440G): the 10% runs finished and are valid (unet 0.8368, unetr 0.7718), but both
+# 50% runs were killed ("DataLoader worker killed by signal") about 30% into training and scored a
+# truncated checkpoint. sstat showed MaxRSS 466,655,956 KB (~445 GiB), i.e. right at the 440G limit.
+# Round 2 (this script): only the two 50% runs, --mem=800G, --num_workers 5 (was 10; memory is
+# assumed to scale with the worker count -- unverified), and node164 excluded (a GPU there returns
+# "CUDA-capable device(s) is/are busy or unavailable"). Watch MaxRSS with:
+#   sstat -j <jobid>.batch --format=JobID,MaxRSS,MaxRSSNode
+# If it is still climbing late in the run, suspect a leak rather than a size problem.
 # =========================
 
 date
@@ -41,7 +46,7 @@ DATALIST="${BASE_DATA_DIR}/${CACHE_DATASET}_100_datalist.json"
 CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${CACHE_DATASET}"
 
 MODELS=("unet" "unetr")
-PERCENTS=("10" "50")
+PERCENTS=("50")   # the 10% runs are done and valid
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
@@ -74,7 +79,7 @@ for PCT in "${PERCENTS[@]}"; do
             --warmup_iters 3000 \
             --learning_rate 1e-4 \
             --batch_size "$BATCH_SIZE" \
-            --num_workers 10 \
+            --num_workers 7 \
             --dataset_percent "$DATASET_PERCENT"
 
         echo "Finished training: $OUTPUT_DIR"
