@@ -19,10 +19,13 @@ binary, N>1 -> multi-class) -- the same auto-detection convention as
 deepict/prepare_from_datalist.py. In binary mode the assembled sigmoid probability map is
 thresholded at --threshold, exactly as before. In multi-class mode (DeePiCt's head is multi-label:
 N independent sigmoid channels, no background channel -- see deepict/README.md's "Binary and
-multi-class"), the N probability maps are turned into one mutually-exclusive prediction by adding
-a synthetic background channel `bg = clip(1 - max(p_1..p_N), 0, 1)` and taking the argmax over
-`[bg, p_1, ..., p_N]` -- see baseline_common.py's score_mask/emit_and_score. Dataset049/EMPIAR-12049
-additionally needs --remap-12049 (merges matrix/centrioles into background before scoring, see
+multi-class") each class is scored as its own binary problem: `prob_k >= --threshold` against
+`label == k`, plus a background entry ("no class >= --threshold" against `label == 0`), each through
+whole-volume Dice and HD95 (baseline_common.score_class; HD95 uses np.percentile so it is not capped
+by torch.quantile's input size). Per-class values are reported as [bg, class 1..N] and the averages
+are their plain means -- see baseline_common.py's emit_and_score. The saved <name>.nii.gz is still one ordinal
+label map (argmax over [bg, p_1..p_N]) for viewing only. Dataset049/EMPIAR-12049 additionally needs
+--remap-12049 (merges matrix/centrioles into background before scoring, see
 baselines/deepict/datalist_utils.py's remap_12049).
 
 Environment: run in the venv built for DeePiCt/membrain, NOT the cryoet conda env:
@@ -169,8 +172,9 @@ def get_args_parser():
                         "before scoring (matches augmentations.py's _remap_12049). Only affects "
                         "the ground truth used for scoring; ignored in binary mode.")
     p.add_argument("--threshold", type=float, default=0.5,
-                   help="Binary mode only: threshold on the sigmoid probability map (default: "
-                        "0.5). Multi-class mode uses argmax instead (see module docstring).")
+                   help="Threshold on each sigmoid probability map (default: 0.5). Binary mode: the "
+                        "foreground mask. Multi-class mode: the per-class mask, and the background "
+                        "is 'no class above it'.")
     p.add_argument("--work-dir", type=str, default=None,
                    help="Scratch dir for .mrc inputs, partitions and probability maps "
                         "(default: <output-dir>/_deepict_work)")
@@ -378,17 +382,13 @@ def main():
 
         if scoring_only:
             expected = load_volume(img_path).shape
-            probs = []
+            prob_paths = []
             for cname in class_names:
                 prob_path = os.path.join(args.predictions_dir, name, cname, "probability_map.mrc")
                 if not os.path.isfile(prob_path):
                     raise SystemExit(f"Error: no probability map for {name}/{cname} at "
                                      f"{prob_path} -- check --predictions-dir / --semantic-class")
-                prob = load_volume(prob_path)
-                if prob.shape != expected:
-                    raise SystemExit(f"Error: probability map shape {prob.shape} != input "
-                                     f"{expected}")
-                probs.append(prob)
+                prob_paths.append(prob_path)
         else:
             # generate_prediction_partition.py silently no-ops when the partition h5 already
             # exists, which would otherwise reuse a partition built with different settings.
@@ -399,7 +399,8 @@ def main():
             for stage in ("generate_prediction_partition.py", "segment.py"):
                 run_stage(os.path.join(scripts, stage), src, cfg_path, name, work_dir)
 
-            probs = []
+            expected = shapes[name]
+            prob_paths = []
             for cname in class_names:
                 # Binary mode: cfg_path's prediction.semantic_class is already class_names[0],
                 # so this reproduces the pre-multi-class code path exactly (same config, no
@@ -414,24 +415,29 @@ def main():
                                          cname, "probability_map.mrc")
                 if not os.path.isfile(prob_path):
                     raise SystemExit(f"Error: DeePiCt produced no probability map at {prob_path}")
-                prob = load_volume(prob_path)
-                if prob.shape != shapes[name]:
-                    raise SystemExit(f"Error: probability map shape {prob.shape} != input "
-                                     f"{shapes[name]}")
-                probs.append(prob)
+                prob_paths.append(prob_path)
+
+        def load_prob(path, expected=expected):
+            prob = load_volume(path)
+            if prob.shape != expected:
+                raise SystemExit(f"Error: probability map shape {prob.shape} != input {expected}")
+            return prob
 
         if multiclass:
-            pred = list(probs)
+            # One loader per class: emit_and_score loads a single map at a time rather than
+            # holding all N full-volume maps in memory.
+            pred = [(lambda p=p: load_prob(p)) for p in prob_paths]
             print(f"  probability maps: classes={class_names}")
         else:
-            pred = (probs[0] >= args.threshold).astype(np.uint8)
+            prob = load_prob(prob_paths[0])
+            pred = (prob >= args.threshold).astype(np.uint8)
+            del prob
             print(f"  probability map (class={class_names[0]}): fg voxels at "
                   f"t={args.threshold}: {int(pred.sum())}")
-        del probs
 
         emit_and_score(name, img_path, label_path, pred, args.output_dir,
                        results, metric, args.cpu_metrics, provenance,
-                       remap_12049_gt=args.remap_12049)
+                       remap_12049_gt=args.remap_12049, threshold=args.threshold)
         del pred
 
     write_metrics_json(results, args.output_dir, extra=provenance)

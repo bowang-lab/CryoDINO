@@ -31,12 +31,15 @@ DATALIST="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset0
 OUT="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines_out/deepict_ds001"
 mkdir -p "$OUT"
 
-# Training already completed successfully (model_best.pth exists under $OUT/out/) -- only the
-# scoring step below failed (missing --cpu-metrics, see next section). Commented out so this
-# resubmission just reruns scoring against the existing trained model.
-# EPOCHS=100 ITERS=300 DEEPICT="$DEEPICT" VENV="$VENV" \
-#   CLASSES=cytoplasm,organelles,membrane \
-#   bash "$KIT_DIR/run_datalist.sh" "$DATALIST" "$OUT"
+# Retrain from scratch for 200 epochs, overwriting the earlier 100-epoch run in this folder. Stale
+# derived outputs (old model, predictions, partitions, TensorBoard log, scoring output) are removed
+# first so nothing from the previous model can be reused; DeePiCt's .done_patterns/ markers are
+# written relative to the working directory, so run from inside $OUT.
+rm -rf "$OUT/out" "$OUT/work" "$OUT/cryodino_metrics"
+cd "$OUT"
+EPOCHS=200 ITERS=300 DEEPICT="$DEEPICT" VENV="$VENV" \
+  CLASSES=cytoplasm,organelles,membrane \
+  bash "$KIT_DIR/run_datalist.sh" "$DATALIST" "$OUT"
 
 echo "Done: $OUT"
 
