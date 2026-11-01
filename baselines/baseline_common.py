@@ -337,10 +337,14 @@ def hd95_exact(pk, gk, percentile=95):
 
     if not pk.any() or not gk.any():
         return float("nan")
+    # MONAI spelled this keyword "symetric" up to 1.3 and "symmetric" afterwards (the DeePiCt venv on
+    # H4H has 1.6.0, the local cryoet env has 1.3.0), so use whichever the installed version accepts.
+    import inspect
+    sym_kw = "symmetric" if "symmetric" in inspect.signature(get_edge_surface_distance).parameters else "symetric"
     try:
         _, distances, _ = get_edge_surface_distance(
             torch.from_numpy(np.ascontiguousarray(pk)), torch.from_numpy(np.ascontiguousarray(gk)),
-            distance_metric="euclidean", symetric=True, class_index=1,
+            distance_metric="euclidean", class_index=1, **{sym_kw: True},
         )
         directed = [float(np.percentile(d.numpy(), percentile)) if d.numel() else float("nan") for d in distances]
         return float(np.max(directed))   # np.max propagates nan, like torch.max in MONAI
