@@ -20,6 +20,7 @@
 # Methods (all three train under the same loss / assigner / NMS decode in detection3d.py):
 #   cryodino    ViTAdapterUNETR on the B200 highres128 training_6249 backbone, backbone frozen
 #               (same as the segmentation fine-tuning scripts, which don't pass --train-feature-model)
+#   cryodino_ft same as cryodino but the backbone is fine-tuned too (--train-feature-model)
 #   random_init ViTAdapterUNETR, no weights (empty path -> build_model_for_eval falls back to
 #               random init), backbone trained (--train-feature-model, as in
 #               slurm_scripts/train_3dino_ft_random_init_patches.sh)
@@ -85,6 +86,12 @@ case "$METHOD" in
     SEGMENTATION_HEAD="ViTAdapterUNETR"
     PRETRAINED_WEIGHTS="$B200_WEIGHTS"
     RUN_NAME="cryodino_b200_highres128_6249_${DATASET}_${PERCENT}pct_vit_adapter"
+    ;;
+  cryodino_ft)
+    SEGMENTATION_HEAD="ViTAdapterUNETR"
+    PRETRAINED_WEIGHTS="$B200_WEIGHTS"
+    EXTRA_ARGS+=(--train-feature-model)
+    RUN_NAME="cryodino_ft_b200_highres128_6249_${DATASET}_${PERCENT}pct_vit_adapter"
     ;;
   random_init)
     SEGMENTATION_HEAD="ViTAdapterUNETR"
