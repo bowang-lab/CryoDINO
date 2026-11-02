@@ -10,8 +10,8 @@
 #SBATCH -p gpu_pmccaiteam
 #SBATCH --account=pmccaiteam_gpu
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=6
-#SBATCH --mem=220G
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=400G
 #SBATCH --time=30:00:00
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
