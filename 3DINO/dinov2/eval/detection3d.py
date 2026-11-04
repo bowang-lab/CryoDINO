@@ -94,6 +94,12 @@ def add_seg_args(parser):
         help="Freeze feature model or not",
     )
     parser.add_argument(
+        "--train-last-n-blocks",
+        type=int,
+        default=0,
+        help="With a frozen backbone, unfreeze only its last N transformer blocks (0 = fully frozen)",
+    )
+    parser.add_argument(
         "--epochs",
         type=int,
         help="Total epochs",
@@ -431,6 +437,14 @@ def do_finetune(feature_model, autocast_dtype, args):
             seg_model.feature_model.vit_model.eval()
             for param in seg_model.feature_model.vit_model.parameters():
                 param.requires_grad = False
+            if args.train_last_n_blocks > 0:
+                # blocks may be chunked (BlockChunk padded with nn.Identity): flatten to the real blocks
+                vit = seg_model.feature_model.vit_model
+                blocks = [b for chunk in vit.blocks for b in chunk if not isinstance(b, nn.Identity)] \
+                    if vit.chunked_blocks else list(vit.blocks)
+                for block in blocks[-args.train_last_n_blocks:]:
+                    for param in block.parameters():
+                        param.requires_grad = True
         else:
             seg_model.feature_model.eval()
             for param in seg_model.feature_model.parameters():
