@@ -23,7 +23,7 @@ KIT_DIR="$BASELINES_DIR/membrain_kit"
 VENV="$KIT_DIR/venv"
 
 DATALIST="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset010_CZII_10010_patches512_100_datalist.json"
-OUT="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines_out/membrain_ds010"
+OUT="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines_out/membrain_ds010_100pct_rerun"
 mkdir -p "$OUT"
 
 EPOCHS=100 ITERS=300 VENV="$VENV" bash "$KIT_DIR/run_datalist.sh" "$DATALIST" "$OUT"

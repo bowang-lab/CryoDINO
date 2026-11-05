@@ -1,21 +1,27 @@
 #!/bin/bash
-#SBATCH -J 3dino-ft-patches-ds-specific-aug-full-ft-lr1e-5
+#SBATCH -J cryodino_3dino-ft-b200-best-ckpt-full-ft-100pct
 #SBATCH -p gpu_pmccaiteam
 #SBATCH -t 6-00:00:00
 #SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=24
-#SBATCH --mem=220G
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=700G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
 
 # =========================
-# Full fine-tuning (unfrozen encoder + decoder): h100_high_res training_9374
-# Pre-extracted 512^3 patches (.pt), N_crops-1 per patch (OOM fix), batch size 2
-# ViTAdapterUNETR head, dataset-specific augmentations (Experiment 4), deep supervision
+# Full fine-tuning (unfrozen ViT encoder + adapter + decoder), 100% training data, all 4 datasets.
+# ViTAdapterUNETR head, --train-feature-model, same setup as the frozen 100% runs
+# (train_3dino_ft_b200_highres*_6249_patches_j*.sh) so the only difference is the encoder being trained.
+# Each dataset uses whichever B200 backbone won the 100% segmentation benchmark for it:
+#   Dataset001/CZII-10001        -> highres112 / training_6249
+#   Dataset010/CZII-10010        -> highres128 / training_6249
+#   EMPIAR-10989                 -> highres128 / training_6249
+#   Dataset049/EMPIAR-12049      -> highres112 / training_6249
+# Output dirs end in _vit_adapter_full_ft so they never collide with the frozen runs.
 # =========================
 
 date
@@ -24,37 +30,56 @@ pwd
 nvidia-smi
 
 source ~/.bashrc
-conda activate cryoet
+conda activate cryodino
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
-# =========================
-# Fixed Parameters
-# =========================
-CONFIG_FILE="dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
-BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
-DATASET_PERCENT=100
 BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream"
+DATASET_PERCENT=100
 SEGMENTATION_HEAD="ViTAdapterUNETR"
 EPOCHS=100
 EPOCH_LENGTH=300
 EVAL_ITERS=600
 WARMUP_ITERS=3000
-IMAGE_SIZE=112
 BATCH_SIZE=2
-NUM_WORKERS=10
 LEARNING_RATE=1e-5
-CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream"
 RESIZE_SCALE=1.0
 OVERLAP=0.75
 
-# Inference parameters — dataset-specific
-declare -A DATALIST
-DATALIST["Dataset001_CZII_10001_patches512"]="${BASE_DATA_DIR}/Dataset001_CZII_10001_patches512_100_datalist.json"
-DATALIST["Dataset010_CZII_10010_patches512"]="${BASE_DATA_DIR}/Dataset010_CZII_10010_patches512_100_datalist.json"
-DATALIST["Dataset989_EMPIAR_10989_transposed_patches512"]="${BASE_DATA_DIR}/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
-DATALIST["Dataset049_EMPIAR_12049_transposed_patches512"]="${BASE_DATA_DIR}/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist.json"
+HIGHRES112_CKPT="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res/eval/training_6249/teacher_checkpoint.pth"
+HIGHRES128_CKPT="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res_128/eval/training_6249/teacher_checkpoint.pth"
+
+declare -A CONFIG_FILE
+CONFIG_FILE["Dataset001_CZII_10001_patches512"]="dinov2/configs/train/vit3d_highres_112.yaml"
+CONFIG_FILE["Dataset010_CZII_10010_patches512"]="dinov2/configs/train/vit3d_highres.yaml"
+CONFIG_FILE["Dataset989_EMPIAR_10989_transposed_patches512"]="dinov2/configs/train/vit3d_highres.yaml"
+CONFIG_FILE["Dataset049_EMPIAR_12049_transposed_patches512"]="dinov2/configs/train/vit3d_highres_112.yaml"
+
+declare -A PRETRAINED_WEIGHTS
+PRETRAINED_WEIGHTS["Dataset001_CZII_10001_patches512"]="$HIGHRES112_CKPT"
+PRETRAINED_WEIGHTS["Dataset010_CZII_10010_patches512"]="$HIGHRES128_CKPT"
+PRETRAINED_WEIGHTS["Dataset989_EMPIAR_10989_transposed_patches512"]="$HIGHRES128_CKPT"
+PRETRAINED_WEIGHTS["Dataset049_EMPIAR_12049_transposed_patches512"]="$HIGHRES112_CKPT"
+
+declare -A BACKBONE_TAG
+BACKBONE_TAG["Dataset001_CZII_10001_patches512"]="ssl3d_run_b200_high_res"
+BACKBONE_TAG["Dataset010_CZII_10010_patches512"]="ssl3d_run_b200_high_res_128"
+BACKBONE_TAG["Dataset989_EMPIAR_10989_transposed_patches512"]="ssl3d_run_b200_high_res_128"
+BACKBONE_TAG["Dataset049_EMPIAR_12049_transposed_patches512"]="ssl3d_run_b200_high_res"
+
+declare -A IMAGE_SIZE
+IMAGE_SIZE["Dataset001_CZII_10001_patches512"]=112
+IMAGE_SIZE["Dataset010_CZII_10010_patches512"]=128
+IMAGE_SIZE["Dataset989_EMPIAR_10989_transposed_patches512"]=128
+IMAGE_SIZE["Dataset049_EMPIAR_12049_transposed_patches512"]=112
+
+declare -A NUM_WORKERS
+NUM_WORKERS["Dataset001_CZII_10001_patches512"]=4
+NUM_WORKERS["Dataset010_CZII_10010_patches512"]=16
+NUM_WORKERS["Dataset989_EMPIAR_10989_transposed_patches512"]=16
+NUM_WORKERS["Dataset049_EMPIAR_12049_transposed_patches512"]=16
 
 declare -A NUM_CLASSES
 NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
@@ -79,28 +104,35 @@ DATASETS=(
 
 for DATASET_NAME in "${DATASETS[@]}"; do
 
-    OUTPUT_DIR="${BASE_OUTPUT_DIR}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_vit_adapter_ds_specific_aug_full_ft_lr1e-5"
+    CFG="${CONFIG_FILE[$DATASET_NAME]}"
+    CKPT="${PRETRAINED_WEIGHTS[$DATASET_NAME]}"
+    IMG_SIZE="${IMAGE_SIZE[$DATASET_NAME]}"
+    WORKERS="${NUM_WORKERS[$DATASET_NAME]}"
+    N_CLASSES="${NUM_CLASSES[$DATASET_NAME]}"
+
+    OUTPUT_DIR="${BASE_OUTPUT_DIR}/${BACKBONE_TAG[$DATASET_NAME]}_training_6249_${DATASET_NAME}_vit_adapter_full_ft"
+    # Reuse the LP sweep's warm per-dataset cache (shared with the frozen 100% runs).
+    CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
     if [[ "$DATASET_NAME" == *"12049"* ]]; then
-        CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}_merged"
-    else
-        CACHE_DIR="${CACHE_DIR_BASE}/ssl3d_run_h100_high_res_training_9374_${DATASET_NAME}"
+        CACHE_DIR="${CACHE_DIR}_merged"
     fi
 
     mkdir -p "$CACHE_DIR"
     mkdir -p "$OUTPUT_DIR"
 
     echo "=============================================="
-    echo "Starting 3D segmentation FULL fine-tuning (patches mode)..."
-    echo "Config: $CONFIG_FILE"
-    echo "Pretrained weights: $PRETRAINED_WEIGHTS"
+    echo "Starting 3D segmentation FULL fine-tuning (100% data)..."
+    echo "Config: $CFG"
+    echo "Pretrained weights: $CKPT"
     echo "Dataset: $DATASET_NAME"
     echo "Output directory: $OUTPUT_DIR"
+    echo "Cache directory: $CACHE_DIR"
     echo "=============================================="
 
     OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=. python dinov2/eval/segmentation3d.py \
-      --config-file "$CONFIG_FILE" \
+      --config-file "$CFG" \
       --output-dir "$OUTPUT_DIR" \
-      --pretrained-weights "$PRETRAINED_WEIGHTS" \
+      --pretrained-weights "$CKPT" \
       --dataset-name "$DATASET_NAME" \
       --dataset-percent "$DATASET_PERCENT" \
       --base-data-dir "$BASE_DATA_DIR" \
@@ -110,13 +142,12 @@ for DATASET_NAME in "${DATASETS[@]}"; do
       --epoch-length "$EPOCH_LENGTH" \
       --eval-iters "$EVAL_ITERS" \
       --warmup-iters "$WARMUP_ITERS" \
-      --image-size "$IMAGE_SIZE" \
+      --image-size "$IMG_SIZE" \
       --batch-size "$BATCH_SIZE" \
-      --num-workers "$NUM_WORKERS" \
+      --num-workers "$WORKERS" \
       --learning-rate "$LEARNING_RATE" \
       --cache-dir "$CACHE_DIR" \
-      --resize-scale "$RESIZE_SCALE" \
-      --deep-supervision
+      --resize-scale "$RESIZE_SCALE"
 
     echo "Finished training: $OUTPUT_DIR"
 
@@ -139,19 +170,18 @@ for DATASET_NAME in "${DATASETS[@]}"; do
         cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
 
         OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python inference/segmentation3d_inference.py \
-          --config-file "3DINO/${CONFIG_FILE}" \
-          --pretrained-weights "$PRETRAINED_WEIGHTS" \
+          --config-file "3DINO/${CFG}" \
+          --pretrained-weights "$CKPT" \
           --checkpoint "$CHECKPOINT" \
           --segmentation-head "$SEGMENTATION_HEAD" \
-          --image-size "$IMAGE_SIZE" \
-          --num-classes "${NUM_CLASSES[$DATASET_NAME]}" \
-          --datalist "${DATALIST[$DATASET_NAME]}" \
+          --image-size "$IMG_SIZE" \
+          --num-classes "$N_CLASSES" \
+          --datalist "${BASE_DATA_DIR}/${DATASET_NAME}_100_datalist.json" \
           --output-dir "$INFER_OUTPUT_DIR" \
           --dataset-name "${INFER_DATASET_NAME[$DATASET_NAME]}" \
           --overlap "$OVERLAP" \
           --batch-size "$BATCH_SIZE" \
-          --cpu-metrics \
-          --deep-supervision
+          --cpu-metrics
 
         echo "Finished inference: $INFER_OUTPUT_DIR"
 
