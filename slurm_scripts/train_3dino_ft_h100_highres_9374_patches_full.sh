@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=700G
+#SBATCH --mem=800G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
@@ -33,6 +33,8 @@ source ~/.bashrc
 conda activate cryodino
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
@@ -77,9 +79,9 @@ IMAGE_SIZE["Dataset049_EMPIAR_12049_transposed_patches512"]=112
 
 declare -A NUM_WORKERS
 NUM_WORKERS["Dataset001_CZII_10001_patches512"]=4
-NUM_WORKERS["Dataset010_CZII_10010_patches512"]=16
-NUM_WORKERS["Dataset989_EMPIAR_10989_transposed_patches512"]=16
-NUM_WORKERS["Dataset049_EMPIAR_12049_transposed_patches512"]=16
+NUM_WORKERS["Dataset010_CZII_10010_patches512"]=4
+NUM_WORKERS["Dataset989_EMPIAR_10989_transposed_patches512"]=4
+NUM_WORKERS["Dataset049_EMPIAR_12049_transposed_patches512"]=4
 
 declare -A NUM_CLASSES
 NUM_CLASSES["Dataset001_CZII_10001_patches512"]=4
@@ -101,6 +103,9 @@ DATASETS=(
     "Dataset989_EMPIAR_10989_transposed_patches512"
     "Dataset049_EMPIAR_12049_transposed_patches512"
     )
+
+# Optional: pass dataset names as arguments to run only a subset
+if [ "$#" -gt 0 ]; then DATASETS=("$@"); fi
 
 for DATASET_NAME in "${DATASETS[@]}"; do
 
@@ -148,6 +153,11 @@ for DATASET_NAME in "${DATASETS[@]}"; do
       --learning-rate "$LEARNING_RATE" \
       --cache-dir "$CACHE_DIR" \
       --resize-scale "$RESIZE_SCALE"
+    TRAIN_STATUS=$?
+    if [ "$TRAIN_STATUS" -ne 0 ]; then
+        echo "FAILED (training, exit $TRAIN_STATUS): $DATASET_NAME"
+        continue
+    fi
 
     echo "Finished training: $OUTPUT_DIR"
 
