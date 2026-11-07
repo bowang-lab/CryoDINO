@@ -36,6 +36,7 @@ __all__ = [
     "CryoMetrics", "clear_cuda_memory", "write_metrics_json",
     "strip_ext", "sample_name", "load_volume", "binarize", "save_mrc", "save_prediction",
     "resolve_samples", "score_mask", "record_metrics", "emit_and_score",
+    "foreground_values", "split_classes", "remap_12049", "target_class",
 ]
 
 VOLUME_EXTS = (".nii.gz", ".nii", ".mrc", ".rec", ".pt", ".h5")
@@ -84,6 +85,45 @@ def binarize(label_arr):
     happens when the string "10010" appears in --dataset-name (default: "dataset").
     """
     return (np.asarray(label_arr) > 0).astype(np.uint8)
+
+
+def target_class(label_arr, value):
+    """Extract one raw label value as a binary mask (uint8), ignoring every other class.
+
+    Used to scope membrain-seg (binary-only architecture) to one specific class on a
+    multi-class dataset -- e.g. membrane-only on Dataset001 (raw value 3) or Dataset049
+    (raw value 2, pre-remap) -- instead of lumping every foreground class together via
+    `binarize`. Copied from `baselines/membrain_kit/datalist_utils.py`.
+    """
+    return (np.asarray(label_arr) == value).astype(np.uint8)
+
+
+def foreground_values(label_arr):
+    """Sorted non-zero label values present in one volume, as ints."""
+    return [int(v) for v in np.unique(label_arr) if int(v) != 0]
+
+
+def split_classes(label_arr, class_values):
+    """Multi-label volume -> one binary uint8 mask per class value, in the given order.
+
+    Copied from `baselines/deepict/datalist_utils.py` (same reasoning as the rest of this
+    module's duplicated I/O helpers: no cross-kit import).
+    """
+    return [(label_arr == v).astype(np.uint8) for v in class_values]
+
+
+def remap_12049(label_arr):
+    """Dataset049/EMPIAR-12049 raw {0..5} -> remapped {0,1,2,3}.
+
+    Matches `_remap_12049` in `3DINO/dinov2/eval/segmentation_3d/augmentations.py` and
+    `baselines/deepict/datalist_utils.py`'s copy: raw classes 1 (matrix) and 5 (centrioles)
+    merge into background, the rest renumber contiguously (2->1, 3->2, 4->3).
+    """
+    out = np.zeros_like(label_arr)
+    out[label_arr == 2] = 1
+    out[label_arr == 3] = 2
+    out[label_arr == 4] = 3
+    return out.astype(label_arr.dtype)
 
 
 def save_mrc(arr, path, dtype=np.float32):
@@ -280,12 +320,84 @@ def score_mask(metric, pred_mask, gt_mask, cpu_metrics=False):
     return metric(logits, target)
 
 
-def emit_and_score(name, img_path, label_path, mask, output_dir, results, metric,
-                   cpu_metrics=False, provenance=None):
-    """Save `mask` as <output_dir>/<name>.nii.gz and, when a label exists, score it into `results`.
+def hd95_exact(pk, gk, percentile=95):
+    """Whole-volume HD95 of one binary problem (`pk` = prediction mask, `gk` = ground-truth mask, bool).
+
+    The same computation as MONAI's HausdorffDistanceMetric -- the edges and the two directed surface
+    distances come from monai.metrics.utils.get_edge_surface_distance, and the result is the larger
+    of the two directed percentiles -- except that the percentile is taken with np.percentile
+    instead of torch.quantile. torch.quantile refuses inputs over 2**24 elements, which a fragmented
+    prediction of a full tomogram exceeds. np.percentile uses the same linear interpolation.
+
+    It is also cheaper than going through CryoMetrics: one distance transform per direction, where
+    CryoMetrics(2) runs HD95 twice (mean and per-class) over both channels, i.e. 4x as many.
+    Returns nan when the prediction or the ground truth is empty (HD95 is undefined).
+    """
+    from monai.metrics.utils import get_edge_surface_distance
+
+    if not pk.any() or not gk.any():
+        return float("nan")
+    # MONAI spelled this keyword "symetric" up to 1.3 and "symmetric" afterwards (the DeePiCt venv on
+    # H4H has 1.6.0, the local cryoet env has 1.3.0), so use whichever the installed version accepts.
+    import inspect
+    sym_kw = "symmetric" if "symmetric" in inspect.signature(get_edge_surface_distance).parameters else "symetric"
+    try:
+        _, distances, _ = get_edge_surface_distance(
+            torch.from_numpy(np.ascontiguousarray(pk)), torch.from_numpy(np.ascontiguousarray(gk)),
+            distance_metric="euclidean", class_index=1, **{sym_kw: True},
+        )
+        directed = [float(np.percentile(d.numpy(), percentile)) if d.numel() else float("nan") for d in distances]
+        return float(np.max(directed))   # np.max propagates nan, like torch.max in MONAI
+    finally:
+        # The edge and distance arrays are full-volume (tens of GB on a tomogram) and were observed to
+        # survive the call -- resident memory grew ~26 GB per class until the OOM killer fired -- so
+        # collect them here instead of leaving it to the next allocation pressure.
+        distances = None
+        gc.collect()
+
+
+def score_class(pk, gk, with_hd=True):
+    """Score one class's binary problem (`pk` prediction mask, `gk` ground-truth mask, both bool).
+
+    Returns (dice, hd95). Dice is 2*TP / (|pred| + |gt|) from voxel counts over the whole volume,
+    which is what MONAI's DiceMetric computes for the foreground channel of a one-hot binary
+    problem. HD95 is `hd95_exact`.
+    """
+    n_pred, n_gt = int(np.count_nonzero(pk)), int(np.count_nonzero(gk))
+    tp = int(np.count_nonzero(pk & gk))
+    dice = 2.0 * tp / (n_pred + n_gt) if (n_pred + n_gt) else float("nan")
+    return dice, (hd95_exact(pk, gk) if with_hd else float("nan"))
+
+
+def emit_and_score(name, img_path, label_path, pred, output_dir, results, metric,
+                   cpu_metrics=False, provenance=None, remap_12049_gt=False,
+                   target_class_value=None, threshold=0.5):
+    """Save the prediction as <output_dir>/<name>.nii.gz and, when a label exists, score it.
 
     The common tail of every per-sample loop in both baseline scripts, in either mode (running the
     model or reading an existing prediction off disk).
+
+    `pred` is either a single hard mask (binary) or a list of N zero-argument callables, one per
+    class, each returning that class's probability map (multi-class). Each map is loaded, scored and
+    freed before the next is loaded -- never all N at once. DeePiCt's multi-class head is multi-label (N independent
+    sigmoids, no background channel, classes may overlap), so multi-class is scored as N+1
+    independent binary problems rather than one mutually-exclusive argmax: class k is
+    `prob_k >= threshold` against `label == k`, and class 0 (background) is "no class >= threshold"
+    against `label == 0`. The per-class values are reported as [bg, class 1..N] and avg_dice /
+    avg_hd95 are their plain means. Dice and HD95 are both whole-volume values (see `score_class`;
+    HD95 uses np.percentile, so it is not limited by torch.quantile's input size).
+
+    The saved volume is one ordinal label map for viewing, filled class by class: voxels where
+    class k passes the threshold are set to k, so where classes overlap the LATER class wins (it is
+    order-dependent, unlike an argmax). It is not what is scored.
+
+    `remap_12049_gt=True` applies Dataset049's background-merge remap to the loaded ground truth
+    before scoring (multi-class mode only).
+
+    `target_class_value` (binary mode only): instead of `binarize(gt)` (every class > 0 counts as
+    foreground), extract this one raw label value as the ground truth -- e.g. membrain-seg scoped
+    to membrane-only on a multi-class dataset. Mutually exclusive with `remap_12049_gt` in
+    practice (binary mode ignores the latter).
 
     Pass `provenance` to rewrite metrics.json after every sample. Scoring a full tomogram is slow
     (HD95 runs four distance transforms over 200-450 M voxels), so a run that is cut short -- a
@@ -293,11 +405,72 @@ def emit_and_score(name, img_path, label_path, mask, output_dir, results, metric
     finished. Aggregates are recomputed from `results` on each call, so a partial file is
     internally consistent; its `overall_*` keys are simply means over fewer tomograms.
     """
-    out_path = save_prediction(mask, img_path, os.path.join(output_dir, name + ".nii.gz"))
-    print(f"  Saved prediction: {out_path}")
+    multiclass = isinstance(pred, (list, tuple))
+    if not multiclass:
+        out_path = save_prediction(pred, img_path, os.path.join(output_dir, name + ".nii.gz"))
+        print(f"  Saved prediction: {out_path}")
+        if label_path:
+            gt = load_volume(label_path)
+            if target_class_value is not None:
+                gt = target_class(gt, target_class_value)
+            else:
+                gt = binarize(gt)
+            record_metrics(results, name, metric, pred, gt, cpu_metrics)
+            del gt
+            if provenance is not None:
+                write_metrics_json(results, output_dir, extra=provenance)
+        clear_cuda_memory()
+        return out_path
+
+    # Multi-class: a single pass over the classes. Each map is loaded, thresholded, written into the
+    # label map, scored, and freed before the next one is loaded. Only the label (uint8), the label
+    # map (uint8) and `anyfg` (bool) stay resident; background is scored last, from `anyfg`.
+    loaders = list(pred)
+    n_cls = len(loaders) + 1
+    gt = None
     if label_path:
-        gt = binarize(load_volume(label_path))
-        record_metrics(results, name, metric, mask, gt, cpu_metrics)
+        gt = load_volume(label_path)
+        if remap_12049_gt:
+            gt = remap_12049(gt)
+        gt = gt.astype(np.uint8)   # labels are small integers; float32 would cost 4x the memory
+    dice, hd = [None] * n_cls, [None] * n_cls
+
+    def score(k, fg):
+        dice[k], hd[k] = score_class(fg, gt == k)
+        print(f"  class {k}: Dice {dice[k]:.4f}  HD95 {hd[k]:.4f}", flush=True)
+
+    out_path = os.path.join(output_dir, name + ".nii.gz")
+    mask = anyfg = None
+    complete = False
+    try:
+        for k, load in enumerate(loaders, 1):
+            fg = np.asarray(load()) >= threshold
+            if mask is None:
+                mask = np.zeros(fg.shape, dtype=np.uint8)
+                anyfg = np.zeros(fg.shape, dtype=bool)
+            mask[fg] = k   # later classes overwrite earlier ones where they overlap
+            anyfg |= fg
+            if gt is not None:
+                score(k, fg)
+            del fg
+        if gt is not None:
+            score(0, ~anyfg)
+        complete = True
+    finally:
+        if mask is not None:   # saved even if a score raised, so the prediction is not lost
+            save_prediction(mask, img_path, out_path)
+            note = "" if complete else "  (PARTIAL: the run stopped before the last classes were filled in)"
+            print(f"  Saved prediction: {out_path}{note}")
+    del mask, anyfg
+    if gt is not None:
+        results[name] = {
+            "avg_dice": float(np.mean(dice)),
+            "per_class_dice": dice,
+            "avg_hd95": float(np.mean(hd)),
+            "per_class_hd95": hd,
+        }
+        print(f"  Dice: {results[name]['avg_dice']:.4f}, Per-class: {dice}")
+        print(f"  HD95: {results[name]['avg_hd95']:.4f}, Per-class: {hd}")
         del gt
         if provenance is not None:
             write_metrics_json(results, output_dir, extra=provenance)

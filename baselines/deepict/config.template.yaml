@@ -20,7 +20,10 @@ cross_validation:
 
 training:
   active: true
-  semantic_classes: ['particle']             # one output channel per class; needs <class>_mask column(s)
+  semantic_classes: ['particle']             # one output channel per class; needs one <class>_mask
+                                             # column per class, each a SEPARATE binary mask volume
+                                             # (not one multi-valued label). prepare_from_datalist.py
+                                             # fills this in from the data.
   processing_tomo: "tomo"                     # raw-tomogram column in the CSV
   box_size: 64                               # cubic patch side sampled from each tomogram
   min_label_fraction: 0.001                  # keep a box only if >= this fraction is labeled
@@ -49,7 +52,9 @@ training:
 
 prediction:
   active: false
-  semantic_class: 'particle'
+  semantic_class: 'particle'                 # ONE class: assemble_prediction.py extracts that
+                                             # channel. predict.sh loops all semantic_classes,
+                                             # writing a .predict_<class>.yaml for each.
 
 postprocessing_clustering:
   active: false

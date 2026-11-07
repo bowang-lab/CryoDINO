@@ -43,6 +43,17 @@ def binarize(label_arr):
     return (label_arr > 0).astype(np.uint8)
 
 
+def target_class(label_arr, value):
+    """Extract one raw label value as a binary mask (uint8), ignoring every other class.
+
+    Used to scope membrain-seg to membrane-only on a multi-class dataset (e.g. Dataset001's
+    membrane is raw value 3, Dataset049's membranes is raw value 2 -- pre-remap, since isolating
+    a single raw value is immune to the other-classes-collapsed-into-background question that
+    the full _remap_12049 exists to solve for DeePiCt's multi-class training).
+    """
+    return (label_arr == value).astype(np.uint8)
+
+
 def save_mrc(arr, path, dtype=np.float32):
     """Write a numpy array to .mrc (membrain's segment reads MRC only, not NIfTI)."""
     import mrcfile

@@ -6,7 +6,8 @@ a **fixed training schedule of `epochs` × `iterations_per_epoch`** (default **1
 training budget is consistent regardless of dataset size.
 
 > **Status:** validated end-to-end on the CZII Dataset010 patches (binary `particle`) on H100
-> MIG nodes, no NaNs.
+> MIG nodes, no NaNs. Multi-class support is verified at the data-preparation and config level
+> (see *Binary and multi-class*); it has not yet been trained end-to-end on a GPU.
 > - 2-tomogram smoke: val Dice 0.45 → 0.79; the `100×300` schedule mechanism verified (startup
 >   assert passes).
 > - **Full 68-tomogram run** (SLURM, `--mem=192G`): 11,822 boxes, `10×300` in **22 min**, peak
@@ -90,15 +91,63 @@ It asserts the loader length equals `iterations_per_epoch` at startup.
 
 ## One-shot from a datalist JSON (train → infer on test → save per sample)
 Given a MONAI-style datalist `{"training":[…],"validation":[…],"test":[…]}` of
-`{"image","label"}` entries (paths used **verbatim**; `.pt` cubes or `.nii.gz`/`.mrc` auto-detected,
-labels binarised `>0`):
+`{"image","label"}` entries (paths used **verbatim**; `.pt` cubes or `.nii.gz`/`.mrc` auto-detected):
 ```bash
 EPOCHS=100 ITERS=300 DEEPICT=/path/DeePiCt VENV=/path/venv bash run_datalist.sh datalist.json run_out
 ```
 Runs `prepare_from_datalist.py` (writes `run_out/data/{raw,masks}/*.mrc`, `metadata.csv`, and a
 `config.yaml` with `training_list`=train / `prediction_list`=test) → `run_pipeline.sh`
 (partition + train, 100×300) → `predict.sh`. Per-test output:
-`run_out/out/predictions/<model>/<tomo>/particle/probability_map.mrc`.
+`run_out/out/predictions/<model>/<tomo>/<class>/probability_map.mrc`.
+
+### Binary and multi-class
+The mode is **auto-detected from the label values**: one distinct foreground value → binary,
+more than one → multi-class (one output channel per class).
+
+```bash
+# name the classes -- recommended; also skips the label pre-scan
+CLASSES=ribosome,membrane,fas bash run_datalist.sh data.json run_out
+# force the old behaviour: collapse every class into one 'particle' target
+BINARY=1 bash run_datalist.sh data.json run_out
+```
+
+Without `CLASSES`, multi-class runs fall back to `class1..classN`. The names become
+`metadata.csv` columns (`<class>_mask`), mask filenames and output directories, so naming them
+makes the results self-describing.
+
+DeePiCt reads a **separate binary mask volume per class** (`generate_training_data.py`), so
+`prepare_from_datalist.py` splits a multi-valued label into one `.mrc` per class rather than
+passing the label through. A class absent from a given tomogram still gets an all-zero mask,
+because every `<class>_mask` cell must resolve to a real file.
+
+Mismatches are caught rather than silently absorbed: a label value with no class assigned is a
+hard error, and running `BINARY=1` over multi-class labels prints a warning saying the classes
+were collapsed.
+
+**Dataset049/EMPIAR-12049 only:** its raw labels are 6-class (`0=bg 1=matrix 2=membranes
+3=microtubules 4=ribosomes 5=centrioles`), but matrix/centrioles are meant to merge into
+background (matching CryoDINO's own `_remap_12049` in
+`3DINO/dinov2/eval/segmentation_3d/augmentations.py`). Pass `REMAP_12049=1` to apply that merge
++ renumbering (raw `{0..5}` → `{0,1,2,3}`) inline, before class detection/splitting:
+```bash
+REMAP_12049=1 CLASSES=membranes,microtubules,ribosomes bash run_datalist.sh data049.json run_out
+```
+Without it, raw values 1 and 5 would each get their own class instead of being folded into
+background.
+
+**Inference costs the same for N classes as for 1.** `generate_prediction_partition.py` and
+`segment.py` are class-independent — the network emits all channels in one pass — and only
+`assemble_prediction.py` is per-class. `predict.sh` therefore segments once per tomogram and
+assembles N times, writing a `.predict_<class>.yaml` per class (upstream's
+`assemble_prediction.py` accepts only `--config_file`).
+
+Two things to know before training multi-class:
+- The head is **multi-label, not softmax**: N binary channels, no background channel. Classes may
+  overlap, and a voxel may be zero in every channel.
+- `min_label_fraction` (default `0.001`) keeps a training box when **any** class clears the
+  threshold (it is a `max` over classes). Rare classes are not systematically dropped, but boxes
+  containing *only* a very rare class can fall below it — on Dataset010, class 1 is 0.009% of the
+  volume. Lower `min_label_fraction` first if a rare class trains poorly.
 Note: DeePiCt derives its own val from `train_split`, so the JSON `validation` split isn't used
 by training (add `--include-val-in-prediction` in `prepare_from_datalist.py` to also predict it).
 Files: `datalist_utils.py`, `prepare_from_datalist.py`, `predict.sh`, `run_datalist.sh`.

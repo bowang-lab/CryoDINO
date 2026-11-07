@@ -29,6 +29,7 @@ nvidia-smi
 
 source ~/.bashrc
 conda activate cryodino
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
 
@@ -77,9 +78,9 @@ mkdir -p "$BASE_OUTPUT_DIR"
 
 CACHE_DATASETS=(
     "Dataset001_CZII_10001_patches512"
-    "Dataset010_CZII_10010_patches512"
-    "Dataset989_EMPIAR_10989_transposed_patches512"
-    "Dataset049_EMPIAR_12049_transposed_patches512"
+    # "Dataset010_CZII_10010_patches512"
+    # "Dataset989_EMPIAR_10989_transposed_patches512"
+    # "Dataset049_EMPIAR_12049_transposed_patches512"
     )
 
 for CACHE_DATASET in "${CACHE_DATASETS[@]}"; do

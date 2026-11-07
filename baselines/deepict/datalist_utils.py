@@ -43,6 +43,38 @@ def binarize(label_arr):
     return (label_arr > 0).astype(np.uint8)
 
 
+def remap_12049(label_arr):
+    """Dataset049/EMPIAR-12049 raw {0..5} -> remapped {0,1,2,3}.
+
+    Matches `_remap_12049` in `3DINO/dinov2/eval/segmentation_3d/augmentations.py` exactly: raw
+    classes 1 (matrix) and 5 (centrioles) merge into background, the rest renumber contiguously
+    (2->1 membranes, 3->2 microtubules, 4->3 ribosomes).
+    """
+    out = np.zeros_like(label_arr)
+    out[label_arr == 2] = 1
+    out[label_arr == 3] = 2
+    out[label_arr == 4] = 3
+    return out.astype(label_arr.dtype)
+
+
+def foreground_values(label_arr):
+    """Sorted non-zero label values present in one volume, as ints."""
+    return [int(v) for v in np.unique(label_arr) if int(v) != 0]
+
+
+def split_classes(label_arr, class_values):
+    """Multi-label volume -> one binary uint8 mask per class value, in the given order.
+
+    DeePiCt trains one output channel per semantic class and reads a *separate* mask volume for
+    each (see generate_training_data.py), so a multi-class label has to be split into N files
+    rather than passed through as a single multi-valued volume.
+
+    A class absent from this particular tomogram still yields an all-zero mask: the
+    <class>_mask column must resolve to a real file for every row of metadata.csv.
+    """
+    return [(label_arr == v).astype(np.uint8) for v in class_values]
+
+
 def save_mrc(arr, path, dtype=np.float32):
     """Write a numpy array to .mrc (membrain's segment reads MRC only, not NIfTI)."""
     import mrcfile

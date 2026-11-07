@@ -7,9 +7,9 @@
 #SBATCH -p gpu_pmccaiteam
 #SBATCH --account=pmccaiteam_gpu
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=6
-#SBATCH --mem=220G
-#SBATCH --time=24:00:00
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=400G
+#SBATCH --time=30:00:00
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
@@ -25,10 +25,27 @@ DEEPICT="$KIT_DIR/DeePiCt"
 VENV="$KIT_DIR/venv"
 
 DATALIST="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset010_CZII_10010_patches512_100_datalist.json"
-OUT="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines_out/deepict_ds010"
+OUT="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines_out/deepict_ds010_200ep"
 mkdir -p "$OUT"
+cd "$OUT"
 
-EPOCHS=100 ITERS=300 DEEPICT="$DEEPICT" VENV="$VENV" bash "$KIT_DIR/run_datalist.sh" "$DATALIST" "$OUT"
+EPOCHS=200 ITERS=300 DEEPICT="$DEEPICT" VENV="$VENV" BINARY=1 bash "$KIT_DIR/run_datalist.sh" "$DATALIST" "$OUT"
 
 echo "Done: $OUT"
+
+echo "=== Scoring with CryoDINO-schema metrics (deepict_inference.py) ==="
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate cryodino
+source "$VENV/bin/activate"
+
+python "$BASELINES_DIR/deepict_inference.py" \
+  --model-path   "$OUT/out/model_best.pth" \
+  --train-config "$OUT/config.yaml" \
+  --deepict-root "$DEEPICT" \
+  --datalist     "$DATALIST" \
+  --output-dir   "$OUT/cryodino_metrics" \
+  --threshold    0.5 \
+  --cpu-metrics
+
+echo "Done: $OUT/cryodino_metrics"
 date

@@ -76,6 +76,11 @@ def get_args_parser():
                    help="Optional directory of label volumes (used with --input-dir)")
     p.add_argument("--threshold", type=float, default=0.0,
                    help="membrain segmentation threshold on the membrane score (default: 0.0)")
+    p.add_argument("--target-class", type=int, default=None,
+                   help="Score against one raw label value instead of binarize(gt>0) -- e.g. 3 "
+                        "for Dataset001's membrane class, 2 for Dataset049's membranes (raw, "
+                        "pre-remap). membrain-seg itself is unaffected (it only ever predicts "
+                        "one binary channel); this only changes what counts as ground truth.")
     p.add_argument("--sw-roi-size", type=int, default=160,
                    help="Sliding window size for inference; must be a multiple of 32 (default: 160)")
     p.add_argument("--no-tta", action="store_true",
@@ -183,7 +188,8 @@ def main():
 
         pred = binarize(load_volume(seg_path))
         emit_and_score(name, img_path, label_path, pred, args.output_dir,
-                       results, metric, args.cpu_metrics, provenance)
+                       results, metric, args.cpu_metrics, provenance,
+                       target_class_value=args.target_class)
         del pred
 
     write_metrics_json(results, args.output_dir, extra=provenance)
