@@ -34,51 +34,53 @@ plt.rcParams.update({
 # Helpers
 # -------------------------------------------------------------------------
 
-def vis_pca(pth, resize=1.0):
-    # load original image, and first 4 PCA components
-    img = torch.tensor(nib.load(f'{pth}/orig.nii.gz').get_fdata())
-    pca0 = torch.tensor(nib.load(f'{pth}/nifti_0.nii.gz').get_fdata())
-    pca1 = torch.tensor(nib.load(f'{pth}/nifti_1.nii.gz').get_fdata())
-    pca2 = torch.tensor(nib.load(f'{pth}/nifti_2.nii.gz').get_fdata())
-    pca3 = torch.tensor(nib.load(f'{pth}/nifti_3.nii.gz').get_fdata())
-    h, w, d = img.shape
-    
-    # background can usually be masked out with a simple threshold (may arbitrarily need to be > threshold or < threshold)
-    # adjust this for your image!
-    bg_mask = (pca0 > 0.5).float()
-    
-    # create PCA volume and normalize each component
-    pca_vol = torch.stack([pca1, pca2, pca3], dim=3)
-    pca_min = pca_vol.view(-1, 3).min(dim=0).values.reshape(1, 1, 1, -1)
-    pca_max = pca_vol.view(-1, 3).max(dim=0).values.reshape(1, 1, 1, -1)
+def _load_ds(path, size, mode):
+    v = torch.from_numpy(np.asarray(nib.load(path).dataobj, dtype=np.float32))
+    if tuple(v.shape) != tuple(size):
+        v = interpolate(v[None, None], size=size, mode=mode)[0, 0]
+    return v
+
+
+def _crop_slices(shape, crop):
+    if crop is None:
+        return tuple(slice(None) for _ in shape)
+    return tuple(
+        slice(max(0, (s - crop) // 2), max(0, (s - crop) // 2) + min(crop, s))
+        for s in shape
+    )
+
+
+def _load_crop(path, crop):
+    img = nib.load(path)
+    sl = _crop_slices(img.shape, crop)
+    return torch.from_numpy(np.asarray(img.dataobj[sl], dtype=np.float32))
+
+
+def vis_pca(pth, crop=None, bg_thr=0.5, contrast_thr=0.4, comps=(1, 2, 3), bg_invert=False, no_bg_mask=False):
+    img = _load_crop(f'{pth}/orig.nii.gz', crop)
+    pca0 = _load_crop(f'{pth}/nifti_0.nii.gz', crop)
+    bg_mask = pca0 < bg_thr if bg_invert else pca0 > bg_thr
+    del pca0
+    pca_vol = torch.stack([_load_crop(f'{pth}/nifti_{i}.nii.gz', crop) for i in comps], dim=3)
+    pca_min = pca_vol.reshape(-1, 3).min(dim=0).values.reshape(1, 1, 1, -1)
+    pca_max = pca_vol.reshape(-1, 3).max(dim=0).values.reshape(1, 1, 1, -1)
     pca_vol = (pca_vol - pca_min) / (pca_max - pca_min)
-    
-    # can make volumes smaller for faster visualization
-    bg_mask = interpolate(
-        bg_mask.unsqueeze(0).unsqueeze(0), size=(int(h*resize), int(w*resize), int(d*resize)), mode='nearest'
-    ).bool()[0, 0]
-    pca_vol = interpolate(
-        pca_vol.unsqueeze(0).permute(0, 4, 1, 2, 3), size=(int(h*resize), int(w*resize), int(d*resize)), mode='nearest'
-    )[0].permute(1, 2, 3, 0)
-    img = interpolate(
-        img.unsqueeze(0).unsqueeze(0), size=(int(h*resize), int(w*resize), int(d*resize)), mode='trilinear'
-    )[0, 0]
-    
-    # set the PCA volume background to white
-    pca_vol[bg_mask, :] = 1.0
-    
-    # this can improve PCA visualization contrast, adjust for your image!
-    pca_vol[pca_vol < 0.4] = 0
+    del pca_min, pca_max
+    if not no_bg_mask:
+        pca_vol[bg_mask, :] = 1.0
+    del bg_mask
+    if contrast_thr > 0:
+        pca_vol[pca_vol < contrast_thr] = 0
     return img.numpy(), pca_vol.numpy()
 
 
-def load_mhsa_heads(mhsa_dir):
-    """Load all nifti_i.nii.gz heads, each normalised to [0,1]."""
+def load_mhsa_heads(mhsa_dir, crop=None, only=None):
     heads, i = [], 0
     while os.path.exists(os.path.join(mhsa_dir, f'nifti_{i}.nii.gz')):
-        h = nib.load(os.path.join(mhsa_dir, f'nifti_{i}.nii.gz')).get_fdata().astype(np.float32)
-        h = (h - h.min()) / (h.max() - h.min() + 1e-8)
-        heads.append(h)
+        if only is None or i == only:
+            h = _load_crop(os.path.join(mhsa_dir, f'nifti_{i}.nii.gz'), crop).numpy()
+            h = (h - h.min()) / (h.max() - h.min() + 1e-8)
+            heads.append(h)
         i += 1
     return heads
 
@@ -127,10 +129,10 @@ def get_pca_slice(pca_vol, plane, idx):
 
 
 # process lbl
-def process_label(lbl_path, target_shape):
-    lbl_vol = nib.load(lbl_path).get_fdata()
-    if lbl_vol.shape != target_shape:
-        lbl_vol = Resize(target_shape, mode='nearest')(torch.tensor(lbl_vol).unsqueeze(0))[0].numpy()
+def process_label(lbl_path, target_shape, crop=None):
+    lbl_vol = _load_crop(lbl_path, crop).numpy()
+    if lbl_vol.shape != tuple(target_shape):
+        lbl_vol = Resize(tuple(target_shape), mode='nearest')(torch.tensor(lbl_vol).unsqueeze(0))[0].numpy()
 
     _lc = np.array([
     [0,    0,   0,   0.00],
@@ -150,9 +152,21 @@ def process_label(lbl_path, target_shape):
 
 def main(args):
     # Load
-    orig_vol, pca_vol = vis_pca(args.pca_dir, resize=1.0)
-    lbl_vol, LABEL_CMAP, LABEL_NORM = process_label(args.lbl_path, orig_vol.shape) if args.lbl_path else (None, None, None)
-    heads = load_mhsa_heads(args.mhsa_dir)
+    # orig_vol, pca_vol = vis_pca(args.pca_dir, resize=1.0)
+    # heads = load_mhsa_heads(args.mhsa_dir, orig_vol.shape)
+    orig_vol, pca_vol = vis_pca(
+        args.pca_dir,
+        crop=args.crop,
+        bg_thr=args.bg_thr,
+        contrast_thr=args.contrast_thr,
+        comps=args.pca_comps,
+        bg_invert=args.bg_invert,
+        no_bg_mask=args.no_bg_mask,
+    )
+    lbl_vol, LABEL_CMAP, LABEL_NORM = process_label(args.lbl_path, orig_vol.shape, args.crop) if args.lbl_path else (None, None, None)
+    heads = load_mhsa_heads(args.mhsa_dir, crop=args.crop, only=args.head_idx)
+    
+    
     n_heads = len(heads)
     print(f'Loaded {n_heads} MHSA heads  |  volume shape: {orig_vol.shape}')
 
@@ -183,7 +197,7 @@ def main(args):
     )
 
     # Column headers
-    headers = ['Orig'] + (['Label'] if has_lbl else []) + ['PCA'] + [f'H{i}' for i in range(n_heads)]
+    headers = ['Orig'] + (['Label'] if has_lbl else []) + ['PCA'] + (['Attention Head'] if args.head_idx is not None else [f'H{i}' for i in range(n_heads)])
     for c, t in enumerate(headers):
         axes[0, c].set_title(t, fontsize=6, fontweight='bold', pad=3)
 
@@ -244,4 +258,11 @@ if __name__ == '__main__':
     parser.add_argument('--output-dir', required=True,       help='Output directory')
     parser.add_argument('--name',       default='sample',    help='Sample name for output filename')
     parser.add_argument('--lbl-path',   default=None,        help='Optional label nifti path')
+    parser.add_argument('--crop', type=int, default=None, help='Center-crop each axis to this size (voxels)')
+    parser.add_argument('--head-idx', type=int, default=None, help='Plot only this attention head; default plots all heads')
+    parser.add_argument('--bg-thr', type=float, default=0.5, help='Threshold for the background mask')
+    parser.add_argument('--contrast-thr', type=float, default=0.4, help='Contrast threshold for the PCA volume; <= 0 disables thresholding')
+    parser.add_argument('--pca-comps', type=int, nargs=3, default=(1, 2, 3), help='PCA component indices used as RGB channels')
+    parser.add_argument('--bg-invert', action='store_true', help='Invert the background mask threshold comparison')
+    parser.add_argument('--no-bg-mask', action='store_true', help='Do not set the PCA background to white')
     main(parser.parse_args())

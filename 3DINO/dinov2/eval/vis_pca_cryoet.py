@@ -162,7 +162,10 @@ def visualize(args):
     if args.input_type == 'full_image' or args.input_type == 'resize':
         output = model_forward(img.unsqueeze(0))
     elif args.input_type == 'sliding_window':
-        output = sliding_window_inference(img.unsqueeze(0), (112, 112, 112), 4, make_patchwise_predictor(model_forward), overlap=0.)
+        window_size = (args.image_size, args.image_size, args.image_size)
+        output = sliding_window_inference(
+            img.unsqueeze(0), window_size, 4, make_patchwise_predictor(model_forward), overlap=0.
+        )
     else:
         raise ValueError(f'Unknown input_type {args.input_type}')
 
