@@ -67,7 +67,15 @@ B200_WEIGHTS="${EXPERIMENTS}/ssl3d_run_b200_high_res_128/eval/training_6249/teac
 
 case "$DATASET" in
   czi) PATCH_DIR="${DETECTION_ROOT}/Dataset440_CZII_10440_detection_patches_128" ;;
-  byu) PATCH_DIR="${DETECTION_ROOT}/byu_detection_patches_128" ;;
+  byu)
+    # BYU_SPLIT=motoronly (default): split lists without the 286 motor-free tomograms, training
+    # rebalanced 1:1 fg:bg. BYU_SPLIT=all: the original lists (same as train_detection.sh).
+    BYU_SPLIT="${BYU_SPLIT:-motoronly}"
+    case "$BYU_SPLIT" in
+      motoronly) PATCH_DIR="${DETECTION_ROOT}/byu_detection_patches_128_motoronly" ;;
+      all)       PATCH_DIR="${DETECTION_ROOT}/byu_detection_patches_128" ;;
+      *) echo "Unknown BYU_SPLIT: $BYU_SPLIT (motoronly|all)"; exit 1 ;;
+    esac ;;
   *) echo "Unknown DATASET: $DATASET"; exit 1 ;;
 esac
 
@@ -129,8 +137,46 @@ NUM_WORKERS="${NUM_WORKERS:-24}"   # of 32 CPUs: loader workers (OMP=1 each); re
 LEARNING_RATE="${LEARNING_RATE:-1e-4}"
 RESIZE_SCALE=1.0
 
+# ViT decoder (ViTAdapterUNETR methods only), overridable via --export=...,DECODER_FUSION=fpn:
+#   adapter (default) original ViT-Adapter + UNETR decoder; run name unchanged
+#   fpn               plain ViT, 4 blocks (ENCODER_LAYERS, default 5,11,17,23) -> strides 2/4/8/16 -> FPN
+#   concat            plain ViT, blocks (ENCODER_LAYERS, default -2,-1) concatenated -> simple pyramid -> FPN
+#   adapter_multi     original adapter head + extra blocks (ENCODER_LAYERS, default 4,10,16,22) fused per
+#                     adapter stage through zero-init 1x1 convs (starts identical to adapter)
+#   adapter_fpn       original adapter head + zero-init FPN top-down residual over the UNETR skips
+# Non-default settings add e.g. _fpnL5_11_17_23 / _concatL-2_-1 / _adapter_multiL4_10_16_22 /
+# _adapter_fpn to the run name.
+DECODER_FUSION="${DECODER_FUSION:-adapter}"
+ENCODER_LAYERS="${ENCODER_LAYERS:-}"
+ENCODER_LAYERS="${ENCODER_LAYERS// /}"
+case "$DECODER_FUSION" in
+  adapter)
+    [ -z "$ENCODER_LAYERS" ] || { echo "ENCODER_LAYERS needs DECODER_FUSION=fpn|concat"; exit 1; } ;;
+  adapter_fpn)
+    [ "$SEGMENTATION_HEAD" = "ViTAdapterUNETR" ] || { echo "DECODER_FUSION=$DECODER_FUSION needs a ViT method, not $METHOD"; exit 1; }
+    [ -z "$ENCODER_LAYERS" ] || { echo "DECODER_FUSION=adapter_fpn takes no ENCODER_LAYERS"; exit 1; }
+    EXTRA_ARGS+=(--decoder-fusion "$DECODER_FUSION")
+    RUN_NAME="${RUN_NAME}_${DECODER_FUSION}"
+    ;;
+  fpn|concat|adapter_multi)
+    [ "$SEGMENTATION_HEAD" = "ViTAdapterUNETR" ] || { echo "DECODER_FUSION=$DECODER_FUSION needs a ViT method, not $METHOD"; exit 1; }
+    if [ -z "$ENCODER_LAYERS" ]; then
+      case "$DECODER_FUSION" in
+        fpn) ENCODER_LAYERS="5,11,17,23" ;;
+        concat) ENCODER_LAYERS="-2,-1" ;;
+        adapter_multi) ENCODER_LAYERS="4,10,16,22" ;;
+      esac
+    fi
+    [[ "$ENCODER_LAYERS" =~ ^-?[0-9]+(,-?[0-9]+)*$ ]] || { echo "Bad ENCODER_LAYERS: $ENCODER_LAYERS"; exit 1; }
+    EXTRA_ARGS+=(--decoder-fusion "$DECODER_FUSION" "--encoder-layers=$ENCODER_LAYERS")   # = form: argparse rejects a separate "-2,-1"
+    RUN_NAME="${RUN_NAME}_${DECODER_FUSION}L${ENCODER_LAYERS//,/_}"
+    ;;
+  *) echo "Unknown DECODER_FUSION: $DECODER_FUSION"; exit 1 ;;
+esac
+
 # Hyperparameters (overridable via --export=...,LEARNING_RATE=1e-5 etc.) go into the run name so
 # runs never share an output/cache dir; refuse to start over an existing run.
+[ "$DATASET" = byu ] && [ "$BYU_SPLIT" = motoronly ] && RUN_NAME="${RUN_NAME}_motoronly"
 RUN_NAME="${RUN_NAME}_lr${LEARNING_RATE}_bs${BATCH_SIZE}_ep${EPOCHS}x${EPOCH_LENGTH}_wu${WARMUP_ITERS}"
 OUTPUT_DIR="${BASE_OUTPUT_DIR}/${RUN_NAME}"
 if [ -e "$OUTPUT_DIR" ]; then echo "Output dir exists, not overwriting: $OUTPUT_DIR"; exit 1; fi
@@ -144,8 +190,10 @@ echo "Detection: method=$METHOD dataset=$DATASET percent=$PERCENT"
 echo "Head: $SEGMENTATION_HEAD  extra: ${EXTRA_ARGS[*]:-none}"
 echo "Pretrained weights: ${PRETRAINED_WEIGHTS:-<none>}"
 echo "Datalist: $DATALIST"
+[ "$DATASET" = byu ] && echo "BYU split: $BYU_SPLIT"
 echo "Output: $OUTPUT_DIR"
 echo "Hyperparams: lr=$LEARNING_RATE batch=$BATCH_SIZE epochs=$EPOCHS x $EPOCH_LENGTH warmup=$WARMUP_ITERS"
+[ "$SEGMENTATION_HEAD" = "ViTAdapterUNETR" ] && echo "ViT decoder: fusion=$DECODER_FUSION encoder_layers=${ENCODER_LAYERS:-<adapter stages, blocks 5,11,17,23>}"
 echo "Git: $(git -C .. rev-parse --short HEAD) on $(git -C .. rev-parse --abbrev-ref HEAD)"
 echo "=============================================="
 

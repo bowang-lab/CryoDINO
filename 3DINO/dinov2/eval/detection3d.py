@@ -8,6 +8,7 @@
 from dinov2.data.loaders import make_detection_dataset_3d
 from dinov2.data import SamplerType, make_data_loader
 from dinov2.eval.detection_3d.detection_heads import UNETRHead, LinearDecoderHead, ViTAdapterUNETRHead, ResNetFPNHead
+from dinov2.eval.detection_3d.detection_heads import build_vit_detection_head, DECODER_FUSIONS, DEFAULT_ENCODER_LAYERS
 from dinov2.eval.setup import get_args_parser, setup_and_build_model_3d, get_autocast_dtype
 from dinov2.utils.config import setup_3d
 from dinov2.eval.detection_3d.augmentations import make_transforms
@@ -153,6 +154,26 @@ def add_seg_args(parser):
         "--deep-supervision",
         action="store_true",
         help="Enable deep supervision with auxiliary decoder outputs (UNETR and ViTAdapterUNETR only)",
+    )
+    parser.add_argument(
+        "--decoder-fusion",
+        type=str,
+        choices=DECODER_FUSIONS,
+        default="adapter",
+        help="ViT decoder for --segmentation-head ViTAdapterUNETR. adapter (default): original "
+             "ViT-Adapter + UNETR decoder. fpn: plain ViT, 4 blocks -> strides 2/4/8/16 -> FPN (as the "
+             "ResNet34-FPN baseline). concat: plain ViT, blocks concatenated -> simple pyramid -> FPN. "
+             "adapter_multi: original adapter head + extra block taps (--encoder-layers) added per stage "
+             "through zero-init 1x1 convs. adapter_fpn: original adapter head + zero-init FPN-style "
+             "top-down residual over the UNETR skips. Both adapter_* start identical to adapter",
+    )
+    parser.add_argument(
+        "--encoder-layers",
+        type=str,
+        default=None,
+        help="Comma list of ViT block indices (0-based, negatives count from the end) for "
+             f"--decoder-fusion concat|fpn|adapter_multi; use the = form for negatives (--encoder-layers=-2,-1). "
+             f"Defaults: {DEFAULT_ENCODER_LAYERS}",
     )
 
     return parser
@@ -414,12 +435,19 @@ def do_finetune(feature_model, autocast_dtype, args):
         seg_model = LinearDecoderHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
     elif args.segmentation_head == 'ViTAdapterUNETR':
         # AA: ViTAdapterUNETRHead has no deep_supervision (removed with decoder1); passing it raised TypeError
-        seg_model = ViTAdapterUNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
+        # --decoder-fusion adapter (default) returns the unchanged ViTAdapterUNETRHead
+        seg_model = build_vit_detection_head(feature_model, input_channels, args.image_size, num_classes,
+                                             autocast_ctx, fusion=args.decoder_fusion,
+                                             encoder_layers=args.encoder_layers)
+        if args.decoder_fusion != 'adapter':
+            print(f"ViT decoder: {args.decoder_fusion}, encoder blocks {seg_model.encoder_layers}", flush=True)
     elif args.segmentation_head == 'ResNetFPN':
         # Same-loss CNN baseline: MONAI ResNet34-FPN from scratch + the same detection head
         seg_model = ResNetFPNHead(input_channels, args.image_size, num_classes, autocast_ctx)
     else:
         raise ValueError(f"Unknown segmentation head: {args.segmentation_head}")
+    if args.segmentation_head != 'ViTAdapterUNETR' and (args.decoder_fusion != 'adapter' or args.encoder_layers):
+        raise ValueError("--decoder-fusion/--encoder-layers only apply to --segmentation-head ViTAdapterUNETR")
 
     # ResNetFPN has no pretrained backbone: every layer trains, so freezing does not apply
     from_scratch = args.segmentation_head == 'ResNetFPN'
