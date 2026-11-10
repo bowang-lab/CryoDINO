@@ -75,13 +75,20 @@ def vis_pca(pth, crop=None, bg_thr=0.5, contrast_thr=0.4, comps=(1, 2, 3), bg_in
 
 
 def load_mhsa_heads(mhsa_dir, crop=None, only=None):
-    heads, i = [], 0
+    """Return {head_idx: normalized volume}. `only` may be None (all), an int, or a set of ints."""
+    if isinstance(only, int):
+        only = {only}
+    heads, i = {}, 0
     while os.path.exists(os.path.join(mhsa_dir, f'nifti_{i}.nii.gz')):
-        if only is None or i == only:
+        if only is None or i in only:
             h = _load_crop(os.path.join(mhsa_dir, f'nifti_{i}.nii.gz'), crop).numpy()
             h = (h - h.min()) / (h.max() - h.min() + 1e-8)
-            heads.append(h)
+            heads[i] = h
         i += 1
+    if only is not None:
+        missing = sorted(set(only) - set(heads))
+        if missing:
+            raise ValueError(f'Head(s) {missing} not found in {mhsa_dir} (found 0..{i - 1})')
     return heads
 
 # def get_slice_indices(depth, lbl_vol=None):
@@ -164,11 +171,24 @@ def main(args):
         no_bg_mask=args.no_bg_mask,
     )
     lbl_vol, LABEL_CMAP, LABEL_NORM = process_label(args.lbl_path, orig_vol.shape, args.crop) if args.lbl_path else (None, None, None)
-    heads = load_mhsa_heads(args.mhsa_dir, crop=args.crop, only=args.head_idx)
-    
-    
-    n_heads = len(heads)
-    print(f'Loaded {n_heads} MHSA heads  |  volume shape: {orig_vol.shape}')
+    PLANES = ['Axial', 'Coronal', 'Sagittal']
+
+    # Which heads go in each row:
+    #   --row-heads 8 12 0 -> row A uses H8, row B H12, row C H0 (one head column)
+    #   --head-idx 10      -> every row uses H10
+    #   neither            -> every row shows all heads
+    if args.row_heads is not None:
+        if len(args.row_heads) != len(PLANES):
+            raise ValueError(f'--row-heads needs {len(PLANES)} values (one per row), got {len(args.row_heads)}')
+        heads = load_mhsa_heads(args.mhsa_dir, crop=args.crop, only=set(args.row_heads))
+        row_head_ids = [[h] for h in args.row_heads]
+    else:
+        heads = load_mhsa_heads(args.mhsa_dir, crop=args.crop, only=args.head_idx)
+        row_head_ids = [sorted(heads)] * len(PLANES)
+    single_head_col = args.row_heads is not None or args.head_idx is not None
+
+    n_heads = len(row_head_ids[0])
+    print(f'Loaded MHSA heads {sorted(heads)}  |  per-row: {row_head_ids}  |  volume shape: {orig_vol.shape}')
 
     # --- previous: z-only rows (begin/middle/end/best±10) ---
     # depth = orig_vol.shape[2]
@@ -178,7 +198,6 @@ def main(args):
     # n_rows  = 6
 
     # --- new: 3 rows — best slice per plane (Axial / Coronal / Sagittal) ---
-    PLANES = ['Axial', 'Coronal', 'Sagittal']
 
     # Layout
     img_disp = (orig_vol - np.percentile(orig_vol, 1)) / (np.percentile(orig_vol, 99) - np.percentile(orig_vol, 1) + 1e-8)
@@ -197,7 +216,7 @@ def main(args):
     )
 
     # Column headers
-    headers = ['Orig'] + (['Label'] if has_lbl else []) + ['PCA'] + (['Attention Head'] if args.head_idx is not None else [f'H{i}' for i in range(n_heads)])
+    headers = ['Orig'] + (['Label'] if has_lbl else []) + ['PCA'] + (['Attention Head'] if single_head_col else [f'H{i}' for i in row_head_ids[0]])
     for c, t in enumerate(headers):
         axes[0, c].set_title(t, fontsize=6, fontweight='bold', pad=3)
 
@@ -238,11 +257,16 @@ def main(args):
         col += 1
 
         # --- MHSA heads ---
-        for h_vol in heads:
-            h_sl = get_slice(h_vol, plane, idx)
+        for h_id in row_head_ids[r]:
+            h_sl = get_slice(heads[h_id], plane, idx)
             axes[r, col].imshow(img_sl, cmap='gray')
             axes[r, col].imshow(h_sl, cmap='jet', alpha=0.5)
             axes[r, col].axis('off')
+            if args.row_heads is not None:
+                # tag which head this row uses, e.g. "H8", in the top-left corner
+                axes[r, col].text(0.03, 0.97, f'H{h_id}', transform=axes[r, col].transAxes,
+                                  fontsize=6, fontweight='bold', color='white', va='top', ha='left',
+                                  bbox=dict(facecolor='black', alpha=0.5, pad=1, edgecolor='none'))
             col += 1
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -260,6 +284,8 @@ if __name__ == '__main__':
     parser.add_argument('--lbl-path',   default=None,        help='Optional label nifti path')
     parser.add_argument('--crop', type=int, default=None, help='Center-crop each axis to this size (voxels)')
     parser.add_argument('--head-idx', type=int, default=None, help='Plot only this attention head; default plots all heads')
+    parser.add_argument('--row-heads', type=int, nargs=3, default=None,
+                        help='One head per row (Axial Coronal Sagittal), e.g. --row-heads 8 12 0. Overrides --head-idx')
     parser.add_argument('--bg-thr', type=float, default=0.5, help='Threshold for the background mask')
     parser.add_argument('--contrast-thr', type=float, default=0.4, help='Contrast threshold for the PCA volume; <= 0 disables thresholding')
     parser.add_argument('--pca-comps', type=int, nargs=3, default=(1, 2, 3), help='PCA component indices used as RGB channels')
