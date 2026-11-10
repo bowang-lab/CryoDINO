@@ -8,7 +8,7 @@
 #SBATCH --mem=64G
 #SBATCH --output=slurm-%x-%j.out
 
-# All-sample PCA overview (one row per tomogram; Orig|Label|PCA for A/C/S).
+# PCA + heads overview: one row per sample cut (NAME:A/C/S); cols Orig|Label|PCA|H0..H15.
 # TS_100_3 and TS_100_4 are excluded (bad PCA / near-empty labels).
 #
 # Usage (from ~/projects/CryoDINO):
@@ -27,7 +27,21 @@ D="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets"
 VIS_BASE="${HOME}/projects/cryoet_pca/vis_output_336/${MODEL}"
 OUT="${HOME}/projects/cryoet_pca/figures_pca_grid/${MODEL}_pca_grid.png"
 
-SAMPLES=(TS_0001 TS_0009 TS_0008 TS_027 TS_028 TS_034 TS_037 TS_041 tomo_01a877)
+# One figure row per entry, in this order. NAME:A = axial, NAME:C = coronal,
+# NAME:S = sagittal; a bare NAME gives all three. Edit freely.
+ROWS=(
+  TS_0001:A TS_0001:C TS_0001:S
+  TS_0009:A TS_0009:C TS_0009:S
+  TS_0008:A TS_0008:C TS_0008:S
+  TS_027:A  TS_027:C  TS_027:S
+  TS_028:A  TS_028:C  TS_028:S
+  TS_034:A  TS_034:C  TS_034:S
+  TS_037:A  TS_037:C  TS_037:S
+  TS_041:A  TS_041:C  TS_041:S
+  tomo_01a877:A tomo_01a877:C tomo_01a877:S
+)
+# Head columns; empty = all heads. e.g. HEADS=(0 5 8 12)
+HEADS=()
 L0="$D/downstream/Dataset000_CZII_10000/labelsTr"
 L1="$D/downstream/Dataset001_CZII_10001/labelsTr"
 LABEL_ARGS=(
@@ -43,10 +57,14 @@ LABEL_ARGS=(
 # Per-sample background threshold overrides, e.g. ("--bg-thr-for" "TS_0009=0.25")
 BG_OVERRIDES=()
 
+HEAD_ARGS=()
+if [[ ${#HEADS[@]} -gt 0 ]]; then HEAD_ARGS=(--heads "${HEADS[@]}"); fi
+
 cd /cluster/home/t149164uhn/projects/CryoDINO
 python visualization/plot_pca_grid.py \
   --vis-base "$VIS_BASE" \
-  --samples "${SAMPLES[@]}" \
+  --rows "${ROWS[@]}" \
+  "${HEAD_ARGS[@]}" \
   "${LABEL_ARGS[@]}" \
   --output "$OUT" \
   --contrast-thr "$CONTRAST_THR" --bg-thr "$BG_THR" \
