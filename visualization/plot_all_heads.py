@@ -262,11 +262,6 @@ def main(args):
             axes[r, col].imshow(img_sl, cmap='gray')
             axes[r, col].imshow(h_sl, cmap='jet', alpha=0.5)
             axes[r, col].axis('off')
-            if args.row_heads is not None:
-                # tag which head this row uses, e.g. "H8", in the top-left corner
-                axes[r, col].text(0.03, 0.97, f'H{h_id}', transform=axes[r, col].transAxes,
-                                  fontsize=6, fontweight='bold', color='white', va='top', ha='left',
-                                  bbox=dict(facecolor='black', alpha=0.5, pad=1, edgecolor='none'))
             col += 1
 
     os.makedirs(args.output_dir, exist_ok=True)
