@@ -74,7 +74,7 @@ def sample_cuts(name, planes, head_ids, args, labels, bg_thrs):
         bg_thr=bg_thrs.get(name, args.bg_thr),
         contrast_thr=args.contrast_thr,
         comps=args.pca_comps,
-        bg_invert=args.bg_invert,
+        bg_invert=args.bg_invert or name in args.bg_invert_for,
         no_bg_mask=args.no_bg_mask,
     )
     lbl_path = labels.get(name)
@@ -147,6 +147,7 @@ def main(args):
             head_ids = args.heads if args.heads is not None else list_heads(
                 os.path.join(args.vis_base, name, 'mhsa'))
         print(f'Loading {name} planes={planes} bg_thr={bg_thrs.get(name, args.bg_thr)} '
+              f'bg_invert={args.bg_invert or name in args.bg_invert_for} '
               f'label={labels.get(name)}')
         for plane, panels in sample_cuts(name, planes, head_ids, args, labels, bg_thrs).items():
             cuts[(name, plane)] = panels
@@ -212,7 +213,8 @@ if __name__ == '__main__':
     ap.add_argument('--bg-thr-for', action='append', help='Per-sample override NAME=thr (repeatable)')
     ap.add_argument('--contrast-thr', type=float, default=0.4)
     ap.add_argument('--pca-comps', type=int, nargs=3, default=(1, 2, 3))
-    ap.add_argument('--bg-invert', action='store_true')
+    ap.add_argument('--bg-invert', action='store_true', help='Invert the background mask for every sample')
+    ap.add_argument('--bg-invert-for', nargs='*', default=[], help='Invert the background mask only for these samples')
     ap.add_argument('--no-bg-mask', action='store_true')
     ap.add_argument('--cell-size', type=float, default=0.8, help='Inches per panel')
     main(ap.parse_args())

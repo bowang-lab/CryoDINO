@@ -38,7 +38,6 @@ ROWS=(
   TS_034:A  TS_034:C  TS_034:S
   TS_037:A  TS_037:C  TS_037:S
   TS_041:A  TS_041:C  TS_041:S
-  tomo_01a877:A tomo_01a877:C tomo_01a877:S
 )
 # Head columns; empty = all heads. e.g. HEADS=(0 5 8 12)
 HEADS=()
@@ -56,6 +55,8 @@ LABEL_ARGS=(
 )
 # Per-sample background threshold overrides, e.g. ("--bg-thr-for" "TS_0009=0.25")
 BG_OVERRIDES=()
+# Samples whose background mask comparison is inverted (pca0 < bg_thr)
+BG_INVERT_FOR=(TS_034 TS_037 TS_041)
 
 HEAD_ARGS=()
 if [[ ${#HEADS[@]} -gt 0 ]]; then HEAD_ARGS=(--heads "${HEADS[@]}"); fi
@@ -68,4 +69,5 @@ python visualization/plot_pca_grid.py \
   "${LABEL_ARGS[@]}" \
   --output "$OUT" \
   --contrast-thr "$CONTRAST_THR" --bg-thr "$BG_THR" \
+  --bg-invert-for "${BG_INVERT_FOR[@]}" \
   "${BG_OVERRIDES[@]}" $EXTRA
