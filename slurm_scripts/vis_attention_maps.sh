@@ -64,14 +64,20 @@ if [[ ! -r "$WEIGHTS" ]]; then
     exit 1
 fi
 
-NAMES=("TS_0001" "TS_0009" "TS_027" "TS_100_3" "TS_100_4" "tomo_01a877")
+D="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets"
+NAMES=("TS_0001" "TS_0009" "TS_027" "TS_100_3" "TS_100_4" "tomo_01a877" "TS_028" "TS_034" "TS_037" "TS_041" "TS_0008")
 IMAGES=(
     "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/imgs/TS_0001_0000.nii.gz"
     "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/imgs/TS_0009_0000.nii.gz"
     "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/imgs/TS_027_0000.nii.gz"
-    "/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection/czi_dataset/Dataset445_CZII_10445/imagesTr/TS_100_3_0000.nii.gz"
-    "/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection/czi_dataset/Dataset446_CZII_10446/imagesTr/TS_100_4_0000.nii.gz"
-    "/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection/train/tomo_01a877.nii.gz"
+    "$D/downstream_detection/czi_dataset/Dataset445_CZII_10445/imagesTr/TS_100_3_0000.nii.gz"
+    "$D/downstream_detection/czi_dataset/Dataset446_CZII_10446/imagesTr/TS_100_4_0000.nii.gz"
+    "$D/downstream_detection/train/tomo_01a877.nii.gz"
+    "$D/downstream/Dataset000_CZII_10000/imagesTr/TS_028_0000.nii.gz"
+    "$D/downstream/Dataset000_CZII_10000/imagesTr/TS_034_0000.nii.gz"
+    "$D/downstream/Dataset000_CZII_10000/imagesTr/TS_037_0000.nii.gz"
+    "$D/downstream/Dataset000_CZII_10000/imagesTr/TS_041_0000.nii.gz"
+    "$D/downstream/Dataset001_CZII_10001/imagesTr/TS_0008_0000.nii.gz"
 )
 
 if [[ ! -r "$VIS_SCRIPT" ]]; then
