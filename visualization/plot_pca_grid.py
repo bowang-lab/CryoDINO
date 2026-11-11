@@ -137,8 +137,11 @@ def main(args):
     head_ids = None
     cuts = {}
     for name, planes in by_sample.items():
-        if not os.path.isdir(os.path.join(args.vis_base, name, 'pca')):
-            print(f'SKIP {name}: no pca dir under {args.vis_base}')
+        pca_dir = os.path.join(args.vis_base, name, 'pca')
+        needed = ['orig.nii.gz', 'nifti_0.nii.gz'] + [f'nifti_{c}.nii.gz' for c in args.pca_comps]
+        missing = [f for f in needed if not os.path.isfile(os.path.join(pca_dir, f))]
+        if missing:
+            print(f'SKIP {name}: incomplete pca output in {pca_dir} (missing {", ".join(missing)})')
             continue
         if name in labels and not os.path.isfile(labels[name]):
             print(f'WARNING {name}: label not found ({labels[name]}); plotting without label')

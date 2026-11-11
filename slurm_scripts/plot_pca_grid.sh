@@ -56,7 +56,7 @@ LABEL_ARGS=(
 # Per-sample background threshold overrides, e.g. ("--bg-thr-for" "TS_0009=0.25")
 BG_OVERRIDES=()
 # Samples whose background mask comparison is inverted (pca0 < bg_thr)
-BG_INVERT_FOR=(TS_037 TS_041)
+BG_INVERT_FOR=(TS_0005 TS_037 TS_041)
 
 HEAD_ARGS=()
 if [[ ${#HEADS[@]} -gt 0 ]]; then HEAD_ARGS=(--heads "${HEADS[@]}"); fi
