@@ -35,7 +35,7 @@ ROWS=(
   TS_0008:A TS_0008:C TS_0008:S
   TS_027:A  TS_027:C  TS_027:S
   TS_028:A  TS_028:C  TS_028:S
-  TS_034:A  TS_034:C  TS_034:S
+  TS_0005:A TS_0005:C TS_0005:S
   TS_037:A  TS_037:C  TS_037:S
   TS_041:A  TS_041:C  TS_041:S
 )
@@ -49,14 +49,14 @@ LABEL_ARGS=(
   --label "TS_0008=$L1/TS_0008.nii.gz"
   --label "TS_027=$L0/TS_027.nii.gz"
   --label "TS_028=$L0/TS_028.nii.gz"
-  --label "TS_034=$L0/TS_034.nii.gz"
+  --label "TS_0005=$L1/TS_0005.nii.gz"
   --label "TS_037=$L0/TS_037.nii.gz"
   --label "TS_041=$L0/TS_041.nii.gz"
 )
 # Per-sample background threshold overrides, e.g. ("--bg-thr-for" "TS_0009=0.25")
 BG_OVERRIDES=()
 # Samples whose background mask comparison is inverted (pca0 < bg_thr)
-BG_INVERT_FOR=(TS_034 TS_037 TS_041)
+BG_INVERT_FOR=(TS_037 TS_041)
 
 HEAD_ARGS=()
 if [[ ${#HEADS[@]} -gt 0 ]]; then HEAD_ARGS=(--heads "${HEADS[@]}"); fi

@@ -65,7 +65,7 @@ if [[ ! -r "$WEIGHTS" ]]; then
 fi
 
 D="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets"
-NAMES=("TS_0001" "TS_0009" "TS_027" "TS_100_3" "TS_100_4" "tomo_01a877" "TS_028" "TS_034" "TS_037" "TS_041" "TS_0008")
+NAMES=("TS_0001" "TS_0009" "TS_027" "TS_100_3" "TS_100_4" "tomo_01a877" "TS_028" "TS_034" "TS_037" "TS_041" "TS_0008" "TS_0005")
 IMAGES=(
     "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/imgs/TS_0001_0000.nii.gz"
     "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/imgs/TS_0009_0000.nii.gz"
@@ -78,6 +78,7 @@ IMAGES=(
     "$D/downstream/Dataset000_CZII_10000/imagesTr/TS_037_0000.nii.gz"
     "$D/downstream/Dataset000_CZII_10000/imagesTr/TS_041_0000.nii.gz"
     "$D/downstream/Dataset001_CZII_10001/imagesTr/TS_0008_0000.nii.gz"
+    "$D/downstream/Dataset001_CZII_10001/imagesTr/TS_0005_0000.nii.gz"
 )
 
 if [[ ! -r "$VIS_SCRIPT" ]]; then
