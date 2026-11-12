@@ -174,10 +174,62 @@ case "$DECODER_FUSION" in
   *) echo "Unknown DECODER_FUSION: $DECODER_FUSION"; exit 1 ;;
 esac
 
+# Opt-in training options (all off by default: no flag passed, run name unchanged), via --export=...:
+#   CLIP_GRAD=3.0    clip the total grad norm (--clip-grad)                         -> _clip3.0
+#   LORA_RANK=16     LoRA on the frozen ViT, METHOD=cryodino only (--lora-rank)     -> _lora16
+#   LORA_ALPHA=32    LoRA alpha, default = LORA_RANK (scale 1)                      -> _a32
+#   LORA_TARGETS     ViT block Linears to adapt, from qkv,proj,fc1,fc2; default qkv,proj (no suffix),
+#                    otherwise e.g. _qkv_proj_fc1_fc2. sbatch --export splits on commas, so separate
+#                    the names with + or : there (LORA_TARGETS=qkv+proj+fc1+fc2)
+#   LORA_LR=1e-4     LoRA learning rate, default = LEARNING_RATE                    -> _loralr1e-4
+# The suffixes go before the _lr..._bs... hyperparameter suffix, LoRA first, then clip.
+is_num() { [[ "$1" =~ ^([0-9]+\.?[0-9]*|\.[0-9]+)([eE][-+]?[0-9]+)?$ ]]; }
+num_eq() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a + 0 == b + 0) }'; }
+CLIP_GRAD="${CLIP_GRAD:-}"
+LORA_RANK="${LORA_RANK:-0}"
+LORA_ALPHA="${LORA_ALPHA:-}"
+LORA_TARGETS="${LORA_TARGETS:-qkv,proj}"
+LORA_TARGETS="${LORA_TARGETS//[+: ]/,}"
+LORA_LR="${LORA_LR:-}"
+if [ -n "$CLIP_GRAD" ]; then
+  { is_num "$CLIP_GRAD" && ! num_eq "$CLIP_GRAD" 0; } || { echo "Bad CLIP_GRAD: $CLIP_GRAD (positive number)"; exit 1; }
+fi
+[[ "$LORA_RANK" =~ ^[0-9]+$ ]] || { echo "Bad LORA_RANK: $LORA_RANK"; exit 1; }
+[[ "$LORA_TARGETS" =~ ^(qkv|proj|fc1|fc2)(,(qkv|proj|fc1|fc2))*$ ]] || { echo "Bad LORA_TARGETS: $LORA_TARGETS (from qkv,proj,fc1,fc2)"; exit 1; }
+for v in "$LORA_ALPHA" "$LORA_LR"; do
+  [ -z "$v" ] || is_num "$v" || { echo "Bad LORA_ALPHA / LORA_LR: $v"; exit 1; }
+done
+LORA_SUFFIX=""
+if [ "$LORA_RANK" -gt 0 ]; then
+  [ "$METHOD" = cryodino ] || { echo "LORA_RANK needs METHOD=cryodino (frozen pretrained ViT), not $METHOD"; exit 1; }
+  EXTRA_ARGS+=(--lora-rank "$LORA_RANK")
+  LORA_SUFFIX="_lora${LORA_RANK}"
+  if [ "$LORA_TARGETS" != "qkv,proj" ]; then
+    EXTRA_ARGS+=(--lora-targets "$LORA_TARGETS")
+    LORA_SUFFIX="${LORA_SUFFIX}_${LORA_TARGETS//,/_}"
+  fi
+  if [ -n "$LORA_ALPHA" ] && ! num_eq "$LORA_ALPHA" "$LORA_RANK"; then
+    EXTRA_ARGS+=(--lora-alpha "$LORA_ALPHA")
+    LORA_SUFFIX="${LORA_SUFFIX}_a${LORA_ALPHA}"
+  fi
+  if [ -n "$LORA_LR" ]; then
+    EXTRA_ARGS+=(--lora-lr "$LORA_LR")
+    LORA_SUFFIX="${LORA_SUFFIX}_loralr${LORA_LR}"
+  fi
+else
+  { [ -z "$LORA_ALPHA" ] && [ -z "$LORA_LR" ] && [ "$LORA_TARGETS" = "qkv,proj" ]; } \
+    || { echo "LORA_ALPHA / LORA_LR / LORA_TARGETS need LORA_RANK > 0"; exit 1; }
+fi
+CLIP_SUFFIX=""
+if [ -n "$CLIP_GRAD" ]; then
+  EXTRA_ARGS+=(--clip-grad "$CLIP_GRAD")
+  CLIP_SUFFIX="_clip${CLIP_GRAD}"
+fi
+
 # Hyperparameters (overridable via --export=...,LEARNING_RATE=1e-5 etc.) go into the run name so
 # runs never share an output/cache dir; refuse to start over an existing run.
 [ "$DATASET" = byu ] && [ "$BYU_SPLIT" = motoronly ] && RUN_NAME="${RUN_NAME}_motoronly"
-RUN_NAME="${RUN_NAME}_lr${LEARNING_RATE}_bs${BATCH_SIZE}_ep${EPOCHS}x${EPOCH_LENGTH}_wu${WARMUP_ITERS}"
+RUN_NAME="${RUN_NAME}${LORA_SUFFIX}${CLIP_SUFFIX}_lr${LEARNING_RATE}_bs${BATCH_SIZE}_ep${EPOCHS}x${EPOCH_LENGTH}_wu${WARMUP_ITERS}"
 OUTPUT_DIR="${BASE_OUTPUT_DIR}/${RUN_NAME}"
 if [ -e "$OUTPUT_DIR" ]; then echo "Output dir exists, not overwriting: $OUTPUT_DIR"; exit 1; fi
 CACHE_DIR="${CACHE_DIR_BASE}/${RUN_NAME}"
@@ -194,6 +246,12 @@ echo "Datalist: $DATALIST"
 echo "Output: $OUTPUT_DIR"
 echo "Hyperparams: lr=$LEARNING_RATE batch=$BATCH_SIZE epochs=$EPOCHS x $EPOCH_LENGTH warmup=$WARMUP_ITERS"
 [ "$SEGMENTATION_HEAD" = "ViTAdapterUNETR" ] && echo "ViT decoder: fusion=$DECODER_FUSION encoder_layers=${ENCODER_LAYERS:-<adapter stages, blocks 5,11,17,23>}"
+echo "Clip grad: ${CLIP_GRAD:-off}"
+if [ "$LORA_RANK" -gt 0 ]; then
+  echo "LoRA: rank=$LORA_RANK alpha=${LORA_ALPHA:-$LORA_RANK} targets=$LORA_TARGETS lr=${LORA_LR:-$LEARNING_RATE (= LEARNING_RATE)}"
+else
+  echo "LoRA: off"
+fi
 echo "Git: $(git -C .. rev-parse --short HEAD) on $(git -C .. rev-parse --abbrev-ref HEAD)"
 echo "=============================================="
 

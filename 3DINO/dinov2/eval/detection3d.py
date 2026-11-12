@@ -23,6 +23,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import json
+import math
 from functools import partial
 # AA: from monai.inferers import sliding_window_inference  # replaced by sliding_window_accumulate
 from monai.optimizers import WarmupCosineSchedule
@@ -65,6 +66,69 @@ def clear_cuda_memory():
             torch.cuda.synchronize()
     except Exception as e:
         print(f"Failed to clear CUDA memory: {e}")
+
+
+# ---------------------------------------------------------------------------------------------
+# Opt-in LoRA on the frozen pretrained ViT (--lora-rank > 0). Off by default.
+# ---------------------------------------------------------------------------------------------
+LORA_TARGETS = ('qkv', 'proj', 'fc1', 'fc2')     # attn.qkv, attn.proj, mlp.fc1, mlp.fc2 of every block
+
+
+class LoRALinear(nn.Module):
+    """A frozen nn.Linear plus a trainable low-rank update:
+        y = x W^T + b + (alpha / rank) * (x A^T) B^T,   A: rank x in, B: out x rank.
+    The wrapped layer's own weight/bias Parameters are re-registered under the same names, so the
+    base state_dict keys (...attn.qkv.weight / .bias) are unchanged and lora_A / lora_B are added
+    beside them. B starts at zero, so at init the output equals the wrapped layer's exactly.
+    A plain module call (F.linear), so it runs under autocast and inside xFormers MemEffAttention."""
+
+    def __init__(self, base, rank, alpha):
+        super().__init__()
+        self.in_features, self.out_features = base.in_features, base.out_features
+        self.weight = base.weight
+        self.register_parameter('bias', base.bias)
+        self.rank = rank
+        self.scaling = alpha / rank
+        kw = dict(device=base.weight.device, dtype=base.weight.dtype)
+        self.lora_A = nn.Parameter(torch.empty(rank, self.in_features, **kw))
+        self.lora_B = nn.Parameter(torch.zeros(self.out_features, rank, **kw))
+        nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))     # as nn.Linear / peft
+
+    def forward(self, x):
+        return F.linear(x, self.weight, self.bias) + F.linear(F.linear(x, self.lora_A), self.lora_B) * self.scaling
+
+    def extra_repr(self):
+        return f"in_features={self.in_features}, out_features={self.out_features}, rank={self.rank}, scaling={self.scaling:g}"
+
+
+def vit_blocks(vit):
+    """The ViT's transformer blocks in order; chunked blocks (BlockChunk padded with nn.Identity)
+    are flattened to the real blocks."""
+    return [b for chunk in vit.blocks for b in chunk if not isinstance(b, nn.Identity)] \
+        if vit.chunked_blocks else list(vit.blocks)
+
+
+def parse_lora_targets(spec):
+    targets = [t.strip() for t in spec.split(',') if t.strip()]
+    bad = [t for t in targets if t not in LORA_TARGETS]
+    if not targets or bad or len(set(targets)) != len(targets):
+        raise ValueError(f"--lora-targets must be a comma list of distinct names from {LORA_TARGETS}, got {spec!r}")
+    return targets
+
+
+def apply_lora(vit, rank, alpha, targets):
+    """Wrap the targeted Linear layers of every ViT block in LoRALinear; returns the LoRA params."""
+    lora_params = []
+    for i, block in enumerate(vit_blocks(vit)):
+        for name in targets:
+            parent = block.attn if name in ('qkv', 'proj') else block.mlp
+            layer = getattr(parent, name, None)
+            if type(layer) is not nn.Linear:
+                raise ValueError(f"LoRA target {name!r} of block {i} is {type(layer).__name__}, not nn.Linear")
+            lora = LoRALinear(layer, rank, alpha)
+            setattr(parent, name, lora)
+            lora_params += [lora.lora_A, lora.lora_B]
+    return lora_params
 
 
 def add_seg_args(parser):
@@ -175,6 +239,40 @@ def add_seg_args(parser):
              f"--decoder-fusion concat|fpn|adapter_multi; use the = form for negatives (--encoder-layers=-2,-1). "
              f"Defaults: {DEFAULT_ENCODER_LAYERS}",
     )
+    parser.add_argument(
+        "--clip-grad",
+        type=float,
+        default=None,
+        help="Clip the total grad norm of the trained parameters to this value (after unscaling the "
+             "GradScaler). Default None / 0: no clipping",
+    )
+    parser.add_argument(
+        "--lora-rank",
+        type=int,
+        default=0,
+        help="LoRA rank on the frozen pretrained ViT (--segmentation-head ViTAdapterUNETR, frozen "
+             "encoder only). 0 (default): no LoRA",
+    )
+    parser.add_argument(
+        "--lora-alpha",
+        type=float,
+        default=None,
+        help="LoRA alpha; the update is scaled by alpha/rank. Default: alpha = rank (scale 1)",
+    )
+    parser.add_argument(
+        "--lora-targets",
+        type=str,
+        default="qkv,proj",
+        help=f"Comma list of the Linear layers in every ViT block to adapt, from {','.join(LORA_TARGETS)} "
+             "(default qkv,proj)",
+    )
+    parser.add_argument(
+        "--lora-lr",
+        type=float,
+        default=None,
+        help="Learning rate of the LoRA parameters (own AdamW param group, same warmup-cosine "
+             "schedule). Default: --learning-rate",
+    )
 
     return parser
 
@@ -211,13 +309,21 @@ def add_seg_args(parser):
 #     scheduler.step()
 #     return loss.item(), loss_dict
 
-def train_iter(model, batch, optimizer, scheduler, scaler, loss_fn):
+def train_iter(model, batch, optimizer, scheduler, scaler, loss_fn, clip_grad=None):
     x      = batch["image"].cuda()
     labels = batch["points"].cuda()
     cls_map, off_map = model(x)
     loss, loss_dict = loss_fn(cls_map, off_map, labels=labels)
     optimizer.zero_grad()
     scaler.scale(loss).backward()
+    if clip_grad:
+        # unscale once here; scaler.step() then skips its own unscale (and still skips the step on inf/nan)
+        scaler.unscale_(optimizer)
+        grad_norm = float(torch.nn.utils.clip_grad_norm_(
+            [p for group in optimizer.param_groups for p in group['params']], clip_grad))
+        if math.isfinite(grad_norm):                    # fp16 overflow steps are skipped by the scaler
+            loss_dict = {**loss_dict, 'grad_norm': grad_norm, 'grad_n': 1.0,
+                         'grad_clipped': float(grad_norm > clip_grad)}
     scaler.step(optimizer)
     scaler.update()
     scheduler.step()
@@ -375,6 +481,20 @@ def detection_val_iter(model, batch, detection_metric, patch_size, stride=2, ove
 
 def do_finetune(feature_model, autocast_dtype, args):
 
+    # opt-in LoRA: validate before the (slow) dataset setup
+    if args.lora_rank < 0:
+        raise ValueError(f"--lora-rank must be >= 0, got {args.lora_rank}")
+    if args.lora_rank > 0:
+        if args.segmentation_head != 'ViTAdapterUNETR':
+            raise ValueError("--lora-rank needs --segmentation-head ViTAdapterUNETR (a pretrained ViT)")
+        if args.train_feature_model or args.train_last_n_blocks > 0:
+            raise ValueError("--lora-rank only applies to the frozen encoder; drop --train-feature-model / "
+                             "--train-last-n-blocks")
+        lora_targets = parse_lora_targets(args.lora_targets)
+        lora_alpha = float(args.lora_rank) if args.lora_alpha is None else args.lora_alpha
+    elif args.lora_alpha is not None or args.lora_lr is not None:
+        raise ValueError("--lora-alpha / --lora-lr need --lora-rank > 0")
+
     # get transforms, dataset, dataloaders
     # AA: old call with extra args (make_transforms signature will expand later):
     # train_transforms, val_transforms = make_transforms(
@@ -467,9 +587,7 @@ def do_finetune(feature_model, autocast_dtype, args):
                 param.requires_grad = False
             if args.train_last_n_blocks > 0:
                 # blocks may be chunked (BlockChunk padded with nn.Identity): flatten to the real blocks
-                vit = seg_model.feature_model.vit_model
-                blocks = [b for chunk in vit.blocks for b in chunk if not isinstance(b, nn.Identity)] \
-                    if vit.chunked_blocks else list(vit.blocks)
+                blocks = vit_blocks(seg_model.feature_model.vit_model)
                 for block in blocks[-args.train_last_n_blocks:]:
                     for param in block.parameters():
                         param.requires_grad = True
@@ -478,6 +596,14 @@ def do_finetune(feature_model, autocast_dtype, args):
             for param in seg_model.feature_model.parameters():
                 param.requires_grad = False
 
+    # LoRA goes on after freezing: the ViT base weights stay frozen, only lora_A / lora_B train
+    lora_params = []
+    if args.lora_rank > 0:
+        lora_params = apply_lora(seg_model.feature_model.vit_model, args.lora_rank, lora_alpha, lora_targets)
+        print(f"LoRA: rank {args.lora_rank}, alpha {lora_alpha:g}, targets {','.join(lora_targets)}, "
+              f"{sum(p.numel() for p in lora_params) / 1e6:.3f}M params in {len(lora_params) // 2} layers, "
+              f"lr {args.lora_lr if args.lora_lr is not None else args.learning_rate:g}", flush=True)
+
     trainable_params = [name for name, param in seg_model.named_parameters() if param.requires_grad]
     print(f"Trainable parameters: {trainable_params}")
     n_total = sum(p.numel() for p in seg_model.parameters())
@@ -485,7 +611,16 @@ def do_finetune(feature_model, autocast_dtype, args):
     print(f"{args.segmentation_head}: {n_total / 1e6:.2f}M params, {n_train / 1e6:.2f}M trainable", flush=True)
 
     # get optimizer, scheduler, loss function, metric
-    optimizer = torch.optim.AdamW(filter(lambda x: x.requires_grad, seg_model.parameters()), lr=args.learning_rate)
+    if lora_params and args.lora_lr is not None:
+        # two param groups; WarmupCosineSchedule (LambdaLR) scales each group's own base lr
+        lora_ids = {id(p) for p in lora_params}
+        other_params = [p for p in seg_model.parameters() if p.requires_grad and id(p) not in lora_ids]
+        optimizer = torch.optim.AdamW([{'params': other_params}, {'params': lora_params, 'lr': args.lora_lr}],
+                                      lr=args.learning_rate)
+    else:
+        optimizer = torch.optim.AdamW(filter(lambda x: x.requires_grad, seg_model.parameters()), lr=args.learning_rate)
+    if args.clip_grad:
+        print(f"Gradient clipping: max total norm {args.clip_grad:g}", flush=True)
     max_iter = args.epochs * args.epoch_length
     scheduler = WarmupCosineSchedule(
         optimizer,
@@ -562,6 +697,7 @@ def do_finetune(feature_model, autocast_dtype, args):
             scheduler=scheduler,
             scaler=scaler,
             loss_fn=loss_fn,
+            clip_grad=args.clip_grad,
         )
         train_loss_sum += train_loss
         train_loss_count += 1
@@ -579,7 +715,11 @@ def do_finetune(feature_model, autocast_dtype, args):
             print(f"[Iter {it}] train loss (mean/{window_count}): {window_sum / window_count:.4f}  "
                   f"cls: {_m.get('cls_loss', 0):.4f}  reg: {_m.get('reg_loss', 0):.5f}  "
                   f"divisor: {_m.get('num_items_in_batch', 0):.1f}  "
-                  f"lr: {scheduler.get_last_lr()[0]:.3e}", flush=True)
+                  f"lr: {scheduler.get_last_lr()[0]:.3e}"
+                  + (f"  grad norm (pre-clip, mean/{int(window_dict.get('grad_n', 0))}): "
+                     f"{window_dict.get('grad_norm', 0) / max(window_dict.get('grad_n', 0), 1):.3f}  "
+                     f"clipped: {window_dict.get('grad_clipped', 0) / max(window_dict.get('grad_n', 0), 1):.0%}"
+                     if args.clip_grad else ""), flush=True)
             window_sum, window_count, window_dict = 0.0, 0, {}
 
         if it > 0 and it % args.eval_iters == 0:
