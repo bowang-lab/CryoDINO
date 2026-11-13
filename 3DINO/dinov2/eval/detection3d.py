@@ -273,6 +273,12 @@ def add_seg_args(parser):
         help="Learning rate of the LoRA parameters (own AdamW param group, same warmup-cosine "
              "schedule). Default: --learning-rate",
     )
+    parser.add_argument(
+        "--save-test-predictions",
+        action="store_true",
+        help="Also write test_predictions.pkl / .csv (all decoded test detections + GT per tomogram) "
+             "next to results.json. Off by default.",
+    )
 
     return parser
 
@@ -880,6 +886,23 @@ def do_finetune(feature_model, autocast_dtype, args):
             'best_val_f4':         float(best_val_f4),
             'best_val_thresholds': best_val_thr,
         }, fp)
+
+    # opt-in: keep the per-tomogram test detections (all candidates + GT) next to results.json
+    if args.save_test_predictions:
+        try:
+            from dinov2.eval.detection_3d.prediction_io import save_test_predictions
+            paths = save_test_predictions(
+                args.output_dir,
+                images=[d["image"] for d in test_ds.data],
+                voxel_sizes=[d.get("voxel_size", 10.0) for d in test_ds.data],
+                metric=test_metric, val_thresholds=best_val_thr,
+                extra={"test_f4": float(test_f4), "test_per_cls_f4": {k: float(v) for k, v in test_per_cls.items()},
+                       "checkpoint": os.path.join(args.output_dir, "best_model.pth"),
+                       "decode": {"overlap": 0.75, "stride": detection_strides, "patch_size": args.image_size,
+                                  "min_score": 0.05, "nms_iou": 0.8}})
+            print(f"Saved test predictions: {paths[0]}, {paths[1]}", flush=True)
+        except Exception as e:  # never lose results.json over this
+            print(f"WARNING: could not save test predictions: {e!r}", flush=True)
 
 
 def main(args):

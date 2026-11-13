@@ -225,6 +225,10 @@ if [ -n "$CLIP_GRAD" ]; then
   EXTRA_ARGS+=(--clip-grad "$CLIP_GRAD")
   CLIP_SUFFIX="_clip${CLIP_GRAD}"
 fi
+# SAVE_TEST_PREDICTIONS=1 (default): also write test_predictions.pkl/.csv (all test detections + GT)
+# next to results.json. Output files only; no effect on training or scores, so no run-name suffix.
+SAVE_TEST_PREDICTIONS="${SAVE_TEST_PREDICTIONS:-1}"
+[ "$SAVE_TEST_PREDICTIONS" = 1 ] && EXTRA_ARGS+=(--save-test-predictions)
 
 # Hyperparameters (overridable via --export=...,LEARNING_RATE=1e-5 etc.) go into the run name so
 # runs never share an output/cache dir; refuse to start over an existing run.
@@ -247,6 +251,7 @@ echo "Output: $OUTPUT_DIR"
 echo "Hyperparams: lr=$LEARNING_RATE batch=$BATCH_SIZE epochs=$EPOCHS x $EPOCH_LENGTH warmup=$WARMUP_ITERS"
 [ "$SEGMENTATION_HEAD" = "ViTAdapterUNETR" ] && echo "ViT decoder: fusion=$DECODER_FUSION encoder_layers=${ENCODER_LAYERS:-<adapter stages, blocks 5,11,17,23>}"
 echo "Clip grad: ${CLIP_GRAD:-off}"
+echo "Save test predictions: $SAVE_TEST_PREDICTIONS"
 if [ "$LORA_RANK" -gt 0 ]; then
   echo "LoRA: rank=$LORA_RANK alpha=${LORA_ALPHA:-$LORA_RANK} targets=$LORA_TARGETS lr=${LORA_LR:-$LEARNING_RATE (= LEARNING_RATE)}"
 else

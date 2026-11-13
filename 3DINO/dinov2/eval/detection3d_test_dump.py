@@ -104,19 +104,19 @@ def main(args):
         print(f"Subset of {len(test_ds.data)} test tomograms: F4 {test_f4:.4f} (not comparable to full test)", flush=True)
     print(f"Recomputed test F4 @ val thresholds: {test_f4:.4f} (results.json: {results['test_f4']:.4f})", flush=True)
 
-    out = {
-        "images": [d["image"] for d in test_ds.data],
-        "data": test_metric._data,
-        "val_thresholds": val_thr,
-        "test_f4": float(test_f4),
-        "test_per_cls_f4": {k: float(v) for k, v in test_per_cls.items()},
-        "test_f4_results_json": results["test_f4"],
-        "patch_crops": crops,   # non-empty = patch-only inference (gt_centers_ang then only GT inside the patch)
-    }
-    path = os.path.join(args.output_dir, "test_predictions.pkl")
-    with open(path, "wb") as f:
-        pickle.dump(out, f)
-    print(f"Saved {path}", flush=True)
+    from dinov2.eval.detection_3d.prediction_io import save_test_predictions
+    paths = save_test_predictions(
+        args.output_dir,
+        images=[d["image"] for d in test_ds.data],
+        voxel_sizes=[d.get("voxel_size", 10.0) for d in test_ds.data],
+        metric=test_metric, val_thresholds=val_thr,
+        extra={"test_f4": float(test_f4), "test_per_cls_f4": {k: float(v) for k, v in test_per_cls.items()},
+               "test_f4_results_json": results["test_f4"],
+               "checkpoint": os.path.join(args.run_dir, "best_model.pth"),
+               "decode": {"overlap": 0.75, "stride": 2, "patch_size": args.image_size,
+                          "min_score": 0.05, "nms_iou": 0.8},
+               "patch_crops": crops})   # non-empty = patch-only inference (figures only)
+    print(f"Saved {paths[0]}, {paths[1]}", flush=True)
 
 
 if __name__ == "__main__":
