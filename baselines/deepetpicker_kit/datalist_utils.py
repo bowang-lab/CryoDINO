@@ -56,6 +56,57 @@ def load_patch(path, image_root=None):
     return torch.load(path, map_location="cpu").numpy().astype(np.float32)
 
 
+def resolve_path(path, root=None):
+    """Datalist paths are used verbatim (as in the deepict/membrain kits). If the file is not there
+    and a root is given, fall back to <root>/<basename> -- for datalists built on another machine."""
+    if os.path.exists(path) or not root:
+        return path
+    return os.path.join(root, os.path.basename(path))
+
+
+def load_nifti_xyz(path):
+    """Load a whole-tomogram .nii/.nii.gz as float32, in nibabel's native (X, Y, Z) order.
+
+    Same read as CryoDINO's detection loader (detection_3d/augmentations.py
+    `_load_detection_image`: nib.load(x).get_fdata()), so a datalist point (p0, p1, p2) indexes
+    this array as vol[p0, p1, p2] -- exactly the convention the .pt patches use.
+    """
+    import nibabel as nib
+
+    return nib.load(path).get_fdata(dtype=np.float32)
+
+
+def standardize(vol):
+    """DeepETPicker's own 'standardization' (utils/normalization.py): float32, x -= mean, x /= std
+    over the whole tomogram. Used when writing data_std/ directly for inference, so inference
+    inputs are normalised exactly as preprocess.py normalises the training tomograms."""
+    vol = np.array(vol, dtype=np.float32, copy=True)
+    vol -= vol.mean()
+    vol /= vol.std()
+    return vol
+
+
+def valid_points(points):
+    """Datalist points -> (N, 5) float array with the -100 'no annotation' rows removed."""
+    p = np.asarray(points, dtype=np.float64).reshape(-1, 5)
+    return p[p[:, 3] >= 0]
+
+
+def check_points_in_volume(points, shape_xyz, name):
+    """Fail loudly if any labelled point lies outside the volume: the cheap test for an axis-order
+    mismatch between the NIfTI and the datalist points."""
+    p = valid_points(points)
+    if len(p) == 0:
+        return 0
+    lo = (p[:, :3] < -0.5).any(axis=1)
+    hi = (p[:, :3] > np.asarray(shape_xyz) - 0.5).any(axis=1)
+    bad = int((lo | hi).sum())
+    if bad:
+        raise SystemExit(f"{name}: {bad}/{len(p)} points fall outside volume shape {tuple(shape_xyz)} "
+                         f"(point max {p[:, :3].max(axis=0)}) -- axis order of NIfTI vs points differs")
+    return len(p)
+
+
 def save_mrc(arr, path, dtype=np.float32):
     """Write a numpy array to .mrc (DeepETPicker reads MRC only)."""
     import mrcfile

@@ -19,6 +19,16 @@ Writes:
   <out>/raw_data/<tomo>.mrc       float32, (184, 630, 630) for Dataset440
   <out>/raw_data/<tomo>.coords    tab-separated ints, cls in 1..num_cls
   <out>/dataset_split.json        tomogram order (== DeepETPicker dataset ids), counts, radii
+
+--internal-val (benchmark mode, see run_benchmark.sh):
+  Every training tomogram is used for training, and ONE entry of the datalist's `validation`
+  split (a whole .nii.gz tomogram, read the same way CryoDINO's detection loader reads it) is
+  added as DeepETPicker's training-time validation volume -- the one its ModelCheckpoint
+  (monitor='val_loss') selects on. It is written as raw_data/zval_<name>.{mrc,coords}: the
+  `zval_` prefix sorts after every `TS_...` name, so it lands at dataset id n_train, which is
+  what bin/train_bash.py requires (train ids must be 0..n_train-1). dataset_split.json then has
+  val_id = n_train and test_id = null. The full validation/test splits are scored separately by
+  infer_splits.py + evaluate_czi.py; this tomogram is only for checkpoint selection.
 """
 import argparse
 import collections
@@ -28,9 +38,11 @@ import sys
 
 import numpy as np
 
-from datalist_utils import load_datalist, load_patch, parse_patch_name, save_mrc, strip_ext
+from datalist_utils import (check_points_in_volume, load_datalist, load_nifti_xyz, load_patch,
+                            parse_patch_name, resolve_path, save_mrc, strip_ext)
 
 PATCH = 128  # cube edge of the datalist patches
+INTERNAL_VAL_PREFIX = "zval_"  # sorts after "TS_..." (0x7a > 0x54), so the val id is n_train
 
 # Dataset440 ground truth, used as a self-check (skip with --no-expect-check).
 EXPECTED_PARTICLES = {
@@ -98,6 +110,36 @@ def merge_points(patches):
     return rows, radii
 
 
+def merge_radii(all_radii, radii, where):
+    for c, r in radii.items():
+        all_radii.setdefault(c, r)
+        if abs(all_radii[c] - r) > 1e-3:
+            raise SystemExit(f"class {c} has two radii: {all_radii[c]} vs {r} ({where})")
+
+
+def mrc_shape_xyz(mrc_path):
+    import mrcfile
+    with mrcfile.open(mrc_path, permissive=True, header_only=True) as m:
+        zyx = (int(m.header.nz), int(m.header.ny), int(m.header.nx))
+    return zyx[::-1]
+
+
+def pick_internal_val(entries, sel):
+    """--internal-val: an int indexes the validation list, anything else matches a basename."""
+    if not entries:
+        raise SystemExit("--internal-val given but the datalist has no `validation` entries")
+    try:
+        e = entries[int(sel)]
+    except ValueError:
+        hits = [e for e in entries if strip_ext(e["image"]) == sel]
+        if len(hits) != 1:
+            raise SystemExit(f"--internal-val {sel!r}: {len(hits)} matching validation entries")
+        e = hits[0]
+    except IndexError:
+        raise SystemExit(f"--internal-val {sel}: only {len(entries)} validation entries")
+    return e, strip_ext(e["image"])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--datalist", required=True)
@@ -113,6 +155,13 @@ def main():
                     help="re-assemble tomograms whose .mrc already exists (reassembly reads ~9 GB "
                          "of patches, so by default an existing .mrc is reused)")
     ap.add_argument("--dry-run", action="store_true", help="report the grouping and stop")
+    ap.add_argument("--internal-val", default=None,
+                    help="benchmark mode: index (int) or basename of one `validation` entry "
+                         "(whole .nii.gz tomogram) to add as DeepETPicker's training-time val "
+                         "volume; all training tomograms are then used for training")
+    ap.add_argument("--nii-root", default=None,
+                    help="fallback dir for .nii.gz entries whose datalist path does not exist "
+                         "(resolved by basename); paths are otherwise used verbatim")
     args = ap.parse_args()
 
     image_root = args.image_root or os.path.join(os.path.dirname(os.path.abspath(args.datalist)),
@@ -130,6 +179,15 @@ def main():
     print(f"{len(tomos)} tomograms from split '{args.split}': " +
           ", ".join(f"{t}({len(groups[t])}p)" for t in tomos))
 
+    val_entry = None
+    if args.internal_val is not None:
+        val_entry, val_src = pick_internal_val(d["validation"], args.internal_val)
+        val_name = INTERNAL_VAL_PREFIX + val_src
+        if sorted(tomos + [val_name])[-1] != val_name:
+            raise SystemExit(f"{val_name} would not sort last after {tomos}")
+        print(f"internal val (DeepETPicker checkpoint selection): validation entry {val_src} "
+              f"-> {val_name}, dataset id {len(tomos)}")
+
     if args.dry_run:
         return
 
@@ -140,17 +198,11 @@ def main():
     for idx, tomo in enumerate(tomos):
         patches = groups[tomo]
         rows, radii = merge_points(patches)
-        for c, r in radii.items():
-            all_radii.setdefault(c, r)
-            if abs(all_radii[c] - r) > 1e-3:
-                raise SystemExit(f"class {c} has two radii: {all_radii[c]} vs {r}")
+        merge_radii(all_radii, radii, tomo)
 
         mrc_path = os.path.join(raw, tomo + ".mrc")
         if os.path.exists(mrc_path) and not args.force:
-            import mrcfile
-            with mrcfile.open(mrc_path, permissive=True, header_only=True) as m:
-                zyx = (int(m.header.nz), int(m.header.ny), int(m.header.nx))
-            shape = zyx[::-1]
+            shape = mrc_shape_xyz(mrc_path)
             reused = " (reused existing mrc)"
         else:
             vol = assemble(patches, image_root)
@@ -173,6 +225,39 @@ def main():
             if len(rows) != exp:
                 raise SystemExit(f"{tomo}: expected {exp} unique particles, got {len(rows)}")
 
+    names = list(tomos)
+    split_extra = {}
+    if val_entry is not None:
+        path = resolve_path(val_entry["image"], args.nii_root)
+        if not os.path.exists(path):
+            raise SystemExit(f"internal val tomogram not found: {path} (set --nii-root?)")
+        rows, radii = merge_points([((0, 0, 0), val_entry.get("points", []), path)])
+        if not rows:
+            raise SystemExit(f"{val_src}: no labelled points (all -100?) -- cannot validate on it")
+        merge_radii(all_radii, radii, val_src)
+        mrc_path = os.path.join(raw, val_name + ".mrc")
+        if os.path.exists(mrc_path) and not args.force:
+            shape = mrc_shape_xyz(mrc_path)
+            reused = " (reused existing mrc)"
+        else:
+            vol = load_nifti_xyz(path)                     # (X, Y, Z), raw intensities --
+            shape = vol.shape                              # preprocess.py standardises it
+            save_mrc(vol.transpose(2, 1, 0), mrc_path)
+            del vol
+            reused = ""
+        check_points_in_volume(val_entry["points"], shape, val_src)
+        coords = np.array([[r[3] + 1, r[0], r[1], r[2]] for r in rows])
+        np.savetxt(os.path.join(raw, val_name + ".coords"), np.rint(coords).astype(int),
+                   fmt="%d", delimiter="\t", newline="\n")
+        counts[val_name], shapes[val_name] = len(rows), list(shape)
+        per_cls = collections.Counter(r[3] for r in rows)
+        print(f"  [id {len(names)}] {val_name} vol={tuple(shape)} -> mrc{tuple(shape[::-1])}  "
+              f"particles={len(rows):4d}  per-class={dict(sorted(per_cls.items()))}  "
+              f"voxel_size={val_entry.get('voxel_size')}{reused}", flush=True)
+        names.append(val_name)
+        split_extra = {"val_id": len(names) - 1, "test_id": None,
+                       "internal_val_source": val_src, "internal_val_image": path}
+
     classes = sorted(all_radii)
     # Diameters must be ODD: utils/coords2labels.py builds a template of edge `dim` but pastes it
     # into a window of edge 2*(dim//2)+1, which for even dim is one voxel larger ("operands could
@@ -180,7 +265,7 @@ def main():
     # diameters (SHREC 7..17, EMPIAR 23).  Round up so the occupancy sphere is never too small.
     diameters = [odd_up(2 * all_radii[c]) for c in classes]
     split = {
-        "tomograms": tomos,                      # index == DeepETPicker dataset id
+        "tomograms": names,                      # index == DeepETPicker dataset id
         "particle_counts": counts,
         "volume_shape_xyz": shapes,
         "classes": classes,                      # 0-based datalist class ids
@@ -189,6 +274,7 @@ def main():
         "ocp_diameter": ",".join(str(x) for x in diameters),
         "num_cls": len(classes),
         "raw_data": raw,
+        **split_extra,
     }
     with open(os.path.join(args.out, "dataset_split.json"), "w") as f:
         json.dump(split, f, indent=2)

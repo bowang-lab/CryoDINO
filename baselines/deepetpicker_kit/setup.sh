@@ -38,7 +38,7 @@ pip install --no-index \
 # pip wheel, so avoiding it keeps the venv self-contained.  Patch 8 makes that import optional.
 # pycm + scikit-plot are likewise skipped -- they are imported by utils/misc.py only for the
 # built-in SHREC-style scorer, which the CLI never reaches (see README); patch 7 makes those
-# imports optional.  This kit scores with its own evaluate.py.
+# imports optional.  This kit scores with evaluate_czi.py (CryoDINO's metrics.py).
 
 # ---------------------------------------------------------------- 2) source patches
 git -C "$DEP" checkout -- . 2>/dev/null || true   # start from pristine sources

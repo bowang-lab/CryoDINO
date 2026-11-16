@@ -22,7 +22,8 @@ def main():
     ap.add_argument("--val-id", type=int, default=None,
                     help="dataset id held out for validation (default: second to last)")
     ap.add_argument("--test-id", type=int, default=None,
-                    help="dataset id held out for the reported metrics (default: last)")
+                    help="dataset id held out for the reported metrics (default: last; -1 = no "
+                         "held-out test tomogram, as written by prepare --internal-val)")
     args = ap.parse_args()
 
     out = os.path.abspath(args.out)
@@ -31,9 +32,18 @@ def main():
 
     n = len(split["tomograms"])
     val_id = split.get("val_id", n - 2) if args.val_id is None else args.val_id
+    # prepare_from_datalist.py --internal-val writes test_id = null: every training tomogram
+    # trains, and the real test split is scored by infer_splits.py/evaluate_czi.py instead.
     test_id = split.get("test_id", n - 1) if args.test_id is None else args.test_id
-    if not (0 <= val_id < n and 0 <= test_id < n):
+    if test_id is not None and test_id < 0:
+        test_id = None
+    if not (0 <= val_id < n and (test_id is None or 0 <= test_id < n)):
         raise SystemExit(f"val/test id out of range for {n} tomograms")
+    # prepare_byu.py --internal-val all: a contiguous block of val ids at the end (bin/train_bash.py
+    # only reads more than the first one when patched with DEP_FULL_VAL, see patch_periodic_ckpt.py)
+    val_ids = (split.get("val_ids") or [val_id]) if args.val_id is None else [val_id]
+    if val_ids != list(range(val_ids[0], val_ids[0] + len(val_ids))) or val_ids[0] != val_id:
+        raise SystemExit(f"val ids {val_ids} are not a contiguous block starting at {val_id}")
 
     diams = [int(d) for d in split["ocp_diameter"].split(",")]
     smallest = min(diams)
@@ -68,7 +78,7 @@ def main():
 
     # train ids must be the contiguous block 0..n-1: bin/train_bash.py derives data_split from
     # len(train_list), not from the ids themselves.
-    train_ids = [i for i in range(n) if i not in (val_id, test_id)]
+    train_ids = [i for i in range(n) if i not in val_ids and i != test_id]
     if train_ids != list(range(len(train_ids))):
         raise SystemExit(f"train ids {train_ids} are not contiguous from 0 -- pick val/test ids "
                          f"at the end of the sorted tomogram list {split['tomograms']}")
@@ -84,12 +94,13 @@ def main():
     print(f"  num_cls={pre_config['num_cls']}  ocp_diameter={pre_config['ocp_diameter']}  "
           f"label_diameter={args.label_diameter}")
     print(f"  train ids {train_arg}: {[names[i] for i in train_ids]}")
-    print(f"  val   id  {val_id}: {names[val_id]}")
-    print(f"  test  id  {test_id}: {names[test_id]}")
-    # consumed by run_datalist.sh
+    print(f"  val   id  {val_id}: {names[val_id]}" + (f" (+{len(val_ids) - 1} more, ids "
+          f"{val_ids[0]}-{val_ids[-1]})" if len(val_ids) > 1 else ""))
+    print(f"  test  id  {test_id}: {names[test_id] if test_id is not None else '(none)'}")
+    # consumed by run_benchmark.sh
     print(f"TRAIN_SET_IDS={train_arg}")
-    print(f"VAL_SET_IDS={val_id}")
-    print(f"TEST_TOMO={names[test_id]}")
+    print(f"VAL_SET_IDS={val_ids[0]}-{val_ids[-1]}" if len(val_ids) > 1 else f"VAL_SET_IDS={val_id}")
+    print(f"TEST_TOMO={names[test_id] if test_id is not None else 'none'}")
     print(f"VAL_TOMO={names[val_id]}")
     print(f"LABEL_NAME=gaussian{args.label_diameter}")
 

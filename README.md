@@ -399,7 +399,7 @@ CryoDINO is compared with the following baselines. Every baseline is trained and
 | MemBrain-seg (membrane class only) | segmentation | `baselines/membrain_kit/` | `baselines/membrain_inference.py` |
 | ResNet34-FPN (from scratch) | detection | `detection3d.py --segmentation-head ResNetFPN` | `detection3d.py` |
 | CryoDINO random init | detection | `slurm_scripts_detection/train_detection.sh` with `METHOD=random_init` | `detection3d.py` |
-| DeepETPicker | detection | `baselines/deepetpicker_kit/` | `baselines/deepetpicker_kit/score_benchmark.py` |
+| DeepETPicker | detection | `baselines/deepetpicker_kit/` | `baselines/deepetpicker_kit/evaluate_czi.py` |
 
 ### Segmentation baselines
 
@@ -427,7 +427,7 @@ OMP_NUM_THREADS=1 PYTHONPATH=. python ../baselines/unet_unetr/train.py \
 
 - **ResNet34-FPN** (from scratch) shares everything with CryoDINO except the backbone: the same loss, assigner, NMS decoding and detection head (`ResNetFPNHead`). Run it with `METHOD=resnetfpn` in `slurm_scripts_detection/train_detection.sh`.
 - **CryoDINO random init** uses the same architecture as CryoDINO with random weights and a trainable backbone (`METHOD=random_init`).
-- **DeepETPicker** (3D ResUNet particle picker) is trained with `baselines/deepetpicker_kit/` (`setup.sh` once, then `run_benchmark.sh` or `slurm_scripts_detection/deepetpicker_czi.sh`) and scored with CryoDINO's own metric code (`score_benchmark.py`), so its F4 is directly comparable. Its README documents the data conversion and the patches applied to the upstream code.
+- **DeepETPicker** (3D ResUNet particle picker) is trained with `baselines/deepetpicker_kit/` on CZI and BYU (`setup.sh` once, then `PERCENT=<100|50|10> bash slurm_scripts_detection/deepetpicker_{czi,byu}.sh` from the login node). It follows the same protocol as `detection3d.py`: 30k iterations at batch 4, a checkpoint every 1,500 iterations chosen on the full validation split, and test scored at the val-chosen thresholds with CryoDINO's own metric code (`evaluate_czi.py` loads `detection_3d/metrics.py`), so its F4 / F2 is directly comparable. Its README documents the protocol, the data conversion and the patches applied to the upstream code.
 - `baselines/detection3d_monai/` is an exploratory MONAI RetinaNet baseline. It trains with MONAI's own anchor-based loss, so it is not a same-loss comparison and is not part of the benchmark.
 
 ### Inference-only baselines (MemBrain-seg / DeePiCt)

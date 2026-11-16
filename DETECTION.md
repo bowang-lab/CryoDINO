@@ -96,6 +96,8 @@ Each run directory holds `results.json` (`test_f4`, `test_per_cls_f4`, `best_val
 
 ## DeepETPicker (baseline)
 
+Run: `PERCENT=<100|50|10> bash slurm_scripts_detection/deepetpicker_czi.sh` (login node; submits train -> 20-checkpoint validation array -> select). Protocol and settings: `baselines/deepetpicker_kit/README.md`. The number to compare is `test_f4_at_val_thresholds` in `metrics_czi.json`.
+
 Each directory holds `metrics_czi.json`, `test/` (per-tomogram `*.coords` predictions), `validation/`, `_checkpoint.txt` and `_timing.json`.
 
 | Split | Results |
