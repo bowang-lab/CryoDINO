@@ -225,3 +225,4 @@ pretrain.json
 downstream/
 dataset/
 manuscript/
+.DS_Store
