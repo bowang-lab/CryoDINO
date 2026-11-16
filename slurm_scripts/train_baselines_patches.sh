@@ -10,7 +10,7 @@
 #SBATCH --mem=220G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Baseline training: UNet and UNETR from random initialization
@@ -54,7 +54,7 @@ DATASETS=(
 )
 MODELS=("unet" "unetr")
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 for MODEL in "${MODELS[@]}"; do
     for DATASET_NAME in "${DATASETS[@]}"; do

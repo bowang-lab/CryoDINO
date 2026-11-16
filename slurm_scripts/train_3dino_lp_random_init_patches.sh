@@ -10,7 +10,7 @@
 #SBATCH --mem=200G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Linear probing with random initialization (no pretraining)
@@ -26,7 +26,7 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoET/3DINO || exit 1
 
 # =========================
 # Fixed Parameters

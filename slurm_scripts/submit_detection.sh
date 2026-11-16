@@ -1,7 +1,7 @@
 #!/bin/bash
 # Submit the detection benchmark (CryoDINO / random-init / ResNetFPN) on H4H.
 #
-# Usage (from /cluster/home/t129616uhn/projects/CryoDINO):
+# Usage (from /cluster/home/<USERNAME>/projects/CryoDINO):
 #   bash slurm_scripts/submit_detection.sh 100          # print the sbatch commands only
 #   bash slurm_scripts/submit_detection.sh 100 --submit # actually submit
 #   bash slurm_scripts/submit_detection.sh "50 10" --submit
@@ -14,7 +14,7 @@ set -euo pipefail
 PERCENTS="${1:?usage: submit_detection.sh \"<percents>\" [--submit]}"
 SUBMIT="${2:-}"
 
-SCRIPT_DIR="${SCRIPT_DIR:-/cluster/home/t129616uhn/projects/CryoDINO/slurm_scripts}"
+SCRIPT_DIR="${SCRIPT_DIR:-/cluster/home/$USER/projects/CryoDINO/slurm_scripts}"
 METHODS=(cryodino random_init resnetfpn)
 DATASETS=(czi byu)
 

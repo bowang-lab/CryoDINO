@@ -10,7 +10,7 @@
 #SBATCH --mem=700G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # One job per dataset: ALL backbones/checkpoints for Dataset001 only.
 # This job exclusively owns the Dataset001 cache dir -> no cross-job cache race.
@@ -21,4 +21,4 @@
 # the still-missing runs (b200_highres128/training_9374, random_init) rerun.
 export LP_DATASETS="Dataset001_CZII_10001_patches512"
 export LP_NUM_WORKERS=8
-bash /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/slurm_scripts/train_3dino_lp_h100_b200_comparison.sh
+bash /cluster/home/$USER/scripts/cryoet/CryoDINO/slurm_scripts/train_3dino_lp_h100_b200_comparison.sh

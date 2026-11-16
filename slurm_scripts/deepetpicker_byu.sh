@@ -22,11 +22,11 @@ set -euo pipefail
 : "${PERCENT:?set PERCENT (100 | 50 | 10)}"
 [ -z "${SLURM_JOB_ID:-}" ] || { echo "ERROR: run this with bash on the login node, not sbatch (it submits the jobs itself)"; exit 1; }
 
-REPO="${REPO:-/cluster/home/t129616uhn/projects/CryoDINO}"
+REPO="${REPO:-/cluster/home/$USER/projects/CryoDINO}"
 export KIT="$REPO/baselines/deepetpicker_kit"
 export VENV="${VENV:-/cluster/projects/pmccaiteam/reza/projects/cryoet/envs/deepetpicker}"
 export DEP="${DEP:-/cluster/projects/pmccaiteam/reza/projects/cryoet/envs/DeepETPicker}"
-LOGS="${LOGS:-/cluster/home/t129616uhn/projects/logs}"
+LOGS="${LOGS:-/cluster/home/$USER/projects/logs}"
 
 [ -f "$KIT/run_benchmark.sh" ] || { echo "ERROR: no run_benchmark.sh under $KIT"; exit 1; }
 [ -f "$VENV/bin/activate" ] || { echo "ERROR: DeepETPicker venv not built at $VENV"; exit 1; }

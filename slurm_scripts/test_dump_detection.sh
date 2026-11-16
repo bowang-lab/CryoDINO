@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=36G
-#SBATCH --output=/cluster/home/t129616uhn/projects/logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/projects/logs/%x_%j.log
 
 # Re-run the test set of a finished detection run with its best_model.pth and save per-tomogram
 # predictions (<run>/test_eval/test_predictions.pkl) for bootstrap CIs. Training outputs untouched.
@@ -23,10 +23,10 @@ PRETRAINED="${PRETRAINED:-none}"; DECODER_FUSION="${DECODER_FUSION:-adapter}"; L
 date; hostname; nvidia-smi --query-gpu=name --format=csv,noheader
 set +u; source ~/.bashrc; conda activate cryoet
 # B200 (sm_100): torch 2.7.1 venv layered on cryoet, as in train_detection_hyp.sh
-nvidia-smi --query-gpu=name --format=csv,noheader | grep -q B200 && source /cluster/projects/pmccaiteam/sumin/envs/cryoet-b200/bin/activate
+nvidia-smi --query-gpu=name --format=csv,noheader | grep -q B200 && source "/cluster/projects/pmccaiteam/<USERNAME>/envs/cryoet-b200/bin/activate"
 set -u
 echo "Python env: $(python -c 'import sys, torch; print(sys.prefix, "torch", torch.__version__)')"
-cd /cluster/home/t129616uhn/projects/CryoDINO/3DINO || exit 1
+cd /cluster/home/$USER/projects/CryoDINO/3DINO || exit 1
 
 DETECTION_ROOT="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
 EXPERIMENTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"

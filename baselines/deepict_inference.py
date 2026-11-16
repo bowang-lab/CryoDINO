@@ -29,7 +29,7 @@ label map (argmax over [bg, p_1..p_N]) for viewing only. Dataset049/EMPIAR-12049
 baselines/deepict/datalist_utils.py's remap_12049).
 
 Environment: run in the venv built for DeePiCt/membrain, NOT the cryoet conda env:
-    module load python/3.11 && source /scratch/cyyu/venvs/membrain/bin/activate
+    module load python/3.11 && source /scratch/<USERNAME>/venvs/membrain/bin/activate
 
 Two input modes (identical to segmentation3d_inference.py):
   1. --datalist: a MONAI datalist JSON; the "test" split is used.

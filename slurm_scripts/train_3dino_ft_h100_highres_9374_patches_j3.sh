@@ -10,7 +10,7 @@
 #SBATCH --mem=220G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Dataset989_EMPIAR_10989 — mix-patch augmentation + fine-tuning
@@ -24,7 +24,7 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO || exit 1
 
 BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 DATASETS_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream"
@@ -58,7 +58,7 @@ echo "=============================================="
 # mv "${AUG_OUTDIR}/${AUG_JSON_NAME}" "${BASE_DATA_DIR}/${AUG_DS}_augmented_100_datalist.json"
 # echo "Moved augmented datalist → ${BASE_DATA_DIR}/${AUG_DS}_augmented_100_datalist.json"
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 # =========================
 # Fixed training parameters
@@ -124,7 +124,7 @@ mkdir -p "$INFER_OUTPUT_DIR"
 if [ ! -f "$CHECKPOINT" ]; then
     echo "  [SKIP inference] checkpoint not found: $CHECKPOINT"
 else
-    cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
+    cd /cluster/home/$USER/scripts/cryoet/CryoDINO || exit 1
 
     OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python inference/segmentation3d_inference.py \
       --config-file "3DINO/${CONFIG_FILE}" \

@@ -222,7 +222,7 @@ On H4H the venv and checkout are `~/venvs/deepetpicker` + `~/deepetpicker/DeepET
 (torch 2.7.1 cu128; used by `slurm_scripts/deepetpicker_*.sh`). Pass `DEP=` / `VENV=` to
 `setup.sh` to build elsewhere.
 
-On Alliance, `setup.sh` builds `/scratch/cyyu/venvs/deepetpicker` (its default) from the wheelhouse
+On Alliance, `setup.sh` builds `/scratch/<USERNAME>/venvs/deepetpicker` (its default) from the wheelhouse
 (`--no-index`): python 3.11, `torch==2.13.0` + `torchvision==0.28.0`,
 `pytorch_lightning==2.6.5`, numpy 2.x, `batchgenerators==0.25.1`, plus pandas / mrcfile /
 scikit-image / scikit-learn / scipy / matplotlib / tensorboard.

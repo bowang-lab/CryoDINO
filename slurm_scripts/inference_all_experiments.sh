@@ -10,7 +10,7 @@
 #SBATCH --mem=300G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Batch inference for all fine-tuning experiments (patches512 mode)
@@ -28,7 +28,7 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoET || exit 1
 
 # =========================
 # Fixed Parameters

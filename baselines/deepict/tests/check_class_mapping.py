@@ -45,7 +45,7 @@ def dice(a, b):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True, help="run dir holding config.yaml")
-    ap.add_argument("--deepict", default="/scratch/cyyu/cryodino/deepict/DeePiCt")
+    ap.add_argument("--deepict", default="/scratch/<USERNAME>/cryodino/deepict/DeePiCt")
     ap.add_argument("--threshold", type=float, default=0.5)
     args = ap.parse_args()
 

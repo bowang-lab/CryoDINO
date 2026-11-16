@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=400G
-#SBATCH --output=/cluster/home/t129616uhn/projects/logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/projects/logs/%x_%j.log
 
 # =========================
 # Detection benchmark: one (method, dataset, percent) run of dinov2/eval/detection3d.py.
@@ -43,7 +43,7 @@ nvidia-smi
 # cryoet has torch 2.1 (cu121), which has no sm_100 kernels. On B200 nodes a venv layered on
 # cryoet (--system-site-packages) supplies torch 2.7.1 cu128 + xformers 0.0.31; every other
 # package still comes from cryoet. A100/H100 use cryoet as is.
-B200_VENV="/cluster/projects/pmccaiteam/sumin/envs/cryoet-b200"
+B200_VENV="/cluster/projects/pmccaiteam/<USERNAME>/envs/cryoet-b200"
 
 set +u   # /etc/bashrc and conda's activate scripts read unset variables
 source ~/.bashrc
@@ -54,7 +54,7 @@ fi
 set -u
 echo "Python env: $(python -c 'import sys, torch; print(sys.prefix, "torch", torch.__version__)')"
 
-cd /cluster/home/t129616uhn/projects/CryoDINO/3DINO || exit 1
+cd /cluster/home/$USER/projects/CryoDINO/3DINO || exit 1
 
 # =========================
 # Paths

@@ -5,7 +5,7 @@
 source ~/.bashrc
 conda activate cryoet
 
-SCRIPT="/cluster/home/t139212uhn/scripts/cryoet/CryoET/dataset/downstream/inspect_dataset.py"
+SCRIPT="/cluster/home/$USER/scripts/cryoet/CryoET/dataset/downstream/inspect_dataset.py"
 DETECTION_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
 OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning_detection"
 

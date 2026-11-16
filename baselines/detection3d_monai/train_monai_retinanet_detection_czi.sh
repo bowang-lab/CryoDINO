@@ -37,7 +37,7 @@ conda activate cryodino
 # gotcha documented in baselines/deepetpicker_kit/README.md. detection3d_monai.py itself
 # self-locates the repo root (walks up looking for 3DINO/ + preprocessing/), so it no longer
 # needs PYTHONPATH=. or to run from inside 3DINO/ — we only need its own absolute path here.
-BASELINES_DIR="${BASELINES_DIR:-/cluster/home/t139212uhn/scripts/cryoet/CryoDINO/baselines}"
+BASELINES_DIR="${BASELINES_DIR:-/cluster/home/$USER/scripts/cryoet/CryoDINO/baselines}"
 SCRIPT_DIR="$BASELINES_DIR/detection3d_monai"
 
 # =========================

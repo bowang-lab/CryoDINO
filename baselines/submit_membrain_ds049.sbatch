@@ -23,7 +23,7 @@ date
 hostname
 nvidia-smi -L || true
 
-BASELINES_DIR="/cluster/home/t139212uhn/scripts/cryoet/CryoDINO/baselines"
+BASELINES_DIR="/cluster/home/$USER/scripts/cryoet/CryoDINO/baselines"
 KIT_DIR="$BASELINES_DIR/membrain_kit"
 VENV="$KIT_DIR/venv"
 TARGET_CLASS=2   # Dataset049's membranes are raw label value 2 (pre-remap)

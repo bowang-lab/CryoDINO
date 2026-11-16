@@ -10,7 +10,7 @@
 #SBATCH --mem=220G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Detection patch generation (CZI)
@@ -26,7 +26,7 @@ pwd
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO || exit 1
 
 # =========================
 # Paths
@@ -40,9 +40,9 @@ CZI_CSV="${DETECTION_BASE}/czi_dataset/Dataset440_CZII_10440/point_annotations.c
 
 # Detection patch output (overlapping 128^3 patches + datalist named for loaders.py)
 PATCH_OUTPUT_DIR="${DETECTION_BASE}/Dataset440_CZII_10440_detection_patches_128"
-#PATCH_OUTPUT_DIR="/cluster/projects/pmccaiteam/sumin/Dataset440_CZII_10440_detection_patches_128"
+#PATCH_OUTPUT_DIR="/cluster/projects/pmccaiteam/<USERNAME>/Dataset440_CZII_10440_detection_patches_128"
 # loaders.py make_detection_dataset_3d reads "{base-data-dir}/{dataset_name}_100_datalist.json"
-#OUTPUT_JSON="/cluster/projects/pmccaiteam/sumin/cryoet/experiments/czi_100_datalist.json"
+#OUTPUT_JSON="/cluster/projects/pmccaiteam/<USERNAME>/cryoet/experiments/czi_100_datalist.json"
 OUTPUT_JSON="${PATCH_OUTPUT_DIR}/czi_100_datalist.json"
 
 # CZI 6-class sigma map (particle radius in Angstroms → sigma_vox = radius / voxel_size)

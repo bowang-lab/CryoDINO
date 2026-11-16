@@ -10,7 +10,7 @@
 #SBATCH --mem=220G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Linear-probing comparison across ALL eval checkpoints of each run:
@@ -34,7 +34,7 @@ date; hostname; pwd; nvidia-smi
 source ~/.bashrc
 conda activate cryodino
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 CONFIG_DEFAULT="dinov2/configs/ssl3d_default_config.yaml"       # global_crops_size 96
 CONFIG_HIGHRES_112="dinov2/configs/train/vit3d_highres_112.yaml" # global_crops_size 112

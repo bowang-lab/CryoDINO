@@ -7,11 +7,11 @@
 # re-running gives the same result rather than layering edits.  Any hand edits you made inside
 # $DEP will be discarded -- keep your changes here in the kit instead.
 #
-# Usage:  [DEP=/scratch/cyyu/cryodino/DeepETPicker VENV=/scratch/cyyu/venvs/deepetpicker] bash setup.sh
+# Usage:  [DEP=/scratch/<USERNAME>/cryodino/DeepETPicker VENV=/scratch/<USERNAME>/venvs/deepetpicker] bash setup.sh
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-: "${DEP:=/scratch/cyyu/cryodino/DeepETPicker}"
-: "${VENV:=/scratch/cyyu/venvs/deepetpicker}"
+: "${DEP:=/scratch/$USER/cryodino/DeepETPicker}"
+: "${VENV:=/scratch/$USER/venvs/deepetpicker}"
 
 [ -d "$DEP" ] || git clone https://github.com/cbmi-group/DeepETPicker "$DEP"
 

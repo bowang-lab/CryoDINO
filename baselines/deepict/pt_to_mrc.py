@@ -29,7 +29,7 @@ def save_mrc(arr, path):
 def main():
     ap = argparse.ArgumentParser()
     # --src is DATASET-SPECIFIC: the CZII .pt-cube dataset. Point it at your own copy.
-    ap.add_argument("--src", default="/home/cyyu/projects/def-wanglab-ab/cryodino/010/"
+    ap.add_argument("--src", default="/home/<USERNAME>/projects/def-wanglab-ab/cryodino/010/"
                                      "Dataset010_CZII_10010_train_patches_512")
     ap.add_argument("--dst", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
     ap.add_argument("--only-tomos", default="", help="comma list of tomo_ids; empty = all")

@@ -1,6 +1,6 @@
 # CZII Detection
 
-Run from `/cluster/home/t129616uhn/projects/CryoDINO` on `uhn-login`.
+Run from `/cluster/home/<USERNAME>/projects/CryoDINO` on `uhn-login`.
 
 ## Paths
 
@@ -102,6 +102,6 @@ Each directory holds `metrics_czi.json`, `test/` (per-tomogram `*.coords` predic
 
 | Split | Results |
 |---|---|
-| 100% | `/cluster/projects/pmccaiteam/charles/deepetpicker/results/czii_100/` |
-| 50%  | `/cluster/projects/pmccaiteam/charles/deepetpicker/results/czii_50/` |
-| 10%  | `/cluster/projects/pmccaiteam/charles/deepetpicker/results/czii_10/` |
+| 100% | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/results/czii_100/` |
+| 50%  | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/results/czii_50/` |
+| 10%  | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/results/czii_10/` |

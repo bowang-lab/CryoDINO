@@ -24,7 +24,7 @@ date
 hostname
 nvidia-smi -L || true
 
-BASELINES_DIR="/cluster/home/t139212uhn/scripts/cryoet/CryoDINO/baselines"
+BASELINES_DIR="/cluster/home/$USER/scripts/cryoet/CryoDINO/baselines"
 KIT_DIR="$BASELINES_DIR/deepict"
 DEEPICT="$KIT_DIR/DeePiCt"
 VENV="$KIT_DIR/venv"

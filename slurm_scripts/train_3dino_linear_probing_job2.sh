@@ -10,7 +10,7 @@
 #SBATCH --mem=110G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Job 2: h100 (37499, 24999, 12499) + h100_high_res (all 4)
@@ -24,7 +24,7 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/3DINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoET/3DINO || exit 1
 
 pretrained_weights_paths=(
     "/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100/eval/training_37499/teacher_checkpoint.pth"

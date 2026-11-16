@@ -10,7 +10,7 @@
 #SBATCH --mem=220G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Fine-tuning: h100_high_res training_9374
@@ -26,7 +26,7 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO || exit 1
 
 # =========================
 # Re-generate patches (all patches, no fg threshold, with zscore)
@@ -139,7 +139,7 @@ for AUG_DS in "${AUG_DATASETS[@]}"; do
     echo "Moved augmented datalist → ${BASE_DATA_DIR}/${AUG_DS}_augmented_100_datalist.json"
 done
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 # =========================
 # Fixed Parameters
@@ -268,7 +268,7 @@ for DATASET_NAME in "${DATASETS[@]}"; do
         echo "Output:     $INFER_OUTPUT_DIR"
         echo "----------------------------------------------"
 
-        cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
+        cd /cluster/home/$USER/scripts/cryoet/CryoDINO || exit 1
 
         OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python inference/segmentation3d_inference.py \
           --config-file "3DINO/${CONFIG_FILE}" \
@@ -286,7 +286,7 @@ for DATASET_NAME in "${DATASETS[@]}"; do
 
         echo "Finished inference: $INFER_OUTPUT_DIR"
 
-        cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+        cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
     fi
 
 done

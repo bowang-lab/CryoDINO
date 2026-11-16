@@ -9,7 +9,7 @@
 #SBATCH --mem=180G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 date
 hostname
@@ -18,7 +18,7 @@ pwd
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/dataset/downstream
+cd /cluster/home/$USER/scripts/cryoet/CryoET/dataset/downstream
 
 python convert_to_b2nd.py \
   /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/Dataset001_CZII_10001_100_datalist.json

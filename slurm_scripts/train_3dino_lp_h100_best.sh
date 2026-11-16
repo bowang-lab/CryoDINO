@@ -10,7 +10,7 @@
 #SBATCH --mem=700G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # H100 linear probing, pinned to its KNOWN BEST checkpoint (training_9374, the
@@ -30,7 +30,7 @@ date; hostname; pwd; nvidia-smi
 source ~/.bashrc
 conda activate cryodino
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 EXP="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 CONFIG_FILE="dinov2/configs/train/vit3d_highres_112.yaml"

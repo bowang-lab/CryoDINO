@@ -59,7 +59,7 @@ CACHE_DATASETS=(
 )
 MODELS=("unet" "unetr")
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 for MODEL in "${MODELS[@]}"; do
     for CACHE_DATASET in "${CACHE_DATASETS[@]}"; do

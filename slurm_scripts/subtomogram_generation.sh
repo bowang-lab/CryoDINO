@@ -9,7 +9,7 @@
 #SBATCH --mem=180G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 date
 hostname
@@ -18,7 +18,7 @@ pwd
 source ~/.bashrc
 conda activate cryoet
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET/preprocessing
+cd /cluster/home/$USER/scripts/cryoet/CryoET/preprocessing
 
 # python subtomograms_generation.py \
 #   -i /cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/10442_imagesTr \

@@ -28,7 +28,7 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryodino
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 # =========================
 # Fixed parameters — B200 highres112 backbone (swap for highres128 by changing

@@ -33,7 +33,7 @@ nvidia-smi
 source ~/.bashrc
 conda activate cryodino
 
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
 BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
@@ -170,7 +170,7 @@ for CACHE_DATASET in "${CACHE_DATASETS[@]}"; do
         echo "Output:     $INFER_OUTPUT_DIR"
         echo "----------------------------------------------"
 
-        cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO || exit 1
+        cd /cluster/home/$USER/scripts/cryoet/CryoDINO || exit 1
 
         OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python inference/segmentation3d_inference.py \
           --config-file "3DINO/${CFG}" \
@@ -188,7 +188,7 @@ for CACHE_DATASET in "${CACHE_DATASETS[@]}"; do
 
         echo "Finished inference: $INFER_OUTPUT_DIR"
 
-        cd /cluster/home/t139212uhn/scripts/cryoet/CryoDINO/3DINO || exit 1
+        cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
     fi
 
 done

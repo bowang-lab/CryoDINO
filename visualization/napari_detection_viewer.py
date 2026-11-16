@@ -1,20 +1,11 @@
 """
 napari viewer for particle-detection results (CryoDINO detection3d.py and the DeepETPicker baseline).
 
-Overlays ground-truth picks and one or more methods' predicted picks on each tomogram of a datalist
-split. Predictions are matched to GT with the same rule as the F-beta metric
-(3DINO/dinov2/eval/detection_3d/metrics.py, compute_metrics), so what you see agrees with the score:
-
-    GT (ring, coloured by class)       every labelled particle
-    <method> picks                     green  = TP  (nearest pick within the match radius of a GT)
-                                       yellow = duplicate (within radius of an already-matched GT;
-                                                the metric counts it as FP)
-                                       red    = FP  (no GT of that class within radius)
-                                       grey   = below the score threshold (only with "show below thr")
-    <method> missed                    orange = GT with no pick of its class within radius (FN)
-
-Match radius: CZI = 0.5 x class radius (Kaggle), BYU = min_radius (1000 A) / voxel_size.
-Thresholds default to the per-class thresholds chosen on validation and can be changed live.
+Same layout as the segmentation viewer (napari_viewer.py): the tomogram plus each method's predicted
+picks (discs coloured by class; only the first method's layer starts visible, toggle the others
+with their eye icons), at the per-class thresholds chosen on validation, and a hidden ground_truth
+layer (rings coloured by class). --check scores the picks
+with the F-beta metric (3DINO/dinov2/eval/detection_3d/metrics.py, compute_metrics).
 
 Inputs (all coordinates are (x, y, z) = NIfTI array axes 0, 1, 2, the datalist convention):
     --datalist      JSON datalist; the --split entries give GT points, voxel_size and image path
@@ -51,9 +42,7 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DEFAULT_METRICS_PY = os.path.join(REPO, "3DINO", "dinov2", "eval", "detection_3d", "metrics.py")
 
 CLASS_COLORS = ["#1f77b4", "#9467bd", "#17becf", "#e377c2", "#bcbd22", "#8c564b"]
-STATUS_COLORS = {"tp": "#2ca02c", "dup": "#ffd700", "fp": "#d62728", "below": "#808080"}
-MISSED_COLOR = "#ff7f0e"
-METHOD_SYMBOLS = ["disc", "square", "triangle_up", "diamond"]
+CLASS_COLOR_NAMES = ["blue", "purple", "cyan", "pink", "olive", "brown"]
 
 
 # ---------------------------------------------------------------------------
@@ -285,186 +274,159 @@ def run_check(tomos, methods, matcher):
 # ---------------------------------------------------------------------------
 
 def launch_viewer(tomos, methods, matcher, byu_marker_radius_ang=150.0):
+    """Same layout as the segmentation viewer (visualization/_napari_utils.py launch_viewer):
+    an 'image' layer, one prediction layer per method, a hidden 'ground_truth' layer, and a
+    Navigation dock with Sample / Previous / Next / Z slice / info. Picks are the ones above each
+    method's validation-chosen threshold, coloured by class; only the first method's layer
+    starts visible."""
     from visualization._napari_utils import _import_napari
 
     napari = _import_napari()
-    from magicgui.widgets import CheckBox, ComboBox, Container, FloatSlider, Label, PushButton, SpinBox
+    from magicgui import magicgui
+    from magicgui.widgets import Container, Label, SpinBox
 
     viewer = napari.Viewer(ndisplay=2, title="CryoET Detection Viewer")
     names = [t.name for t in tomos]
     cls_names = matcher.class_names
-    thresholds = {m.name: dict(m.thresholds) for m in methods}     # live, editable copy
-    state = {"idx": None, "syncing": False}
-
-    tomo_cb = ComboBox(choices=names, value=names[0], label="Tomogram")
-    prev_btn, next_btn = PushButton(text="Previous"), PushButton(text="Next")
-    z_spin = SpinBox(value=0, min=0, max=1, label="Z slice")
-    class_cb = ComboBox(choices=["all"] + cls_names, value="all", label="Class")
-    method_cb = ComboBox(choices=[m.name for m in methods], label="Threshold of")
-    thr_slider = FloatSlider(value=0.0, min=0.0, max=1.0, step=0.005, label="Score thr")
-    show_below = CheckBox(text="show below thr", value=False)
-    reset_btn = PushButton(text="Reset to val thresholds")
-    info = Label(value="")
+    current_idx = [None]
+    _syncing = [False]
 
     def display_radius_vox(c, vs):
         if matcher.dataset == "czi":
             return matcher.radii_ang[c] / vs
         return byu_marker_radius_ang / vs
 
-    def class_filter(cls_col):
-        if class_cb.value == "all":
-            return np.ones(len(cls_col), dtype=bool)
-        return cls_col == cls_names.index(class_cb.value)
+    z_slider = SpinBox(value=0, min=0, max=1, label="Z slice", step=1)
 
-    def replace_points(name, data_xyz, **kw):
-        visible = viewer.layers[name].visible if name in viewer.layers else kw.pop("visible", True)
-        kw.pop("visible", None)
-        if name in viewer.layers:
-            viewer.layers.remove(name)
+    def _on_z_slider_changed(val):
+        if not _syncing[0]:
+            _syncing[0] = True
+            viewer.dims.set_point(0, val)
+            _syncing[0] = False
+
+    z_slider.changed.connect(_on_z_slider_changed)
+
+    def _on_dims_change(event=None):
+        if not _syncing[0]:
+            _syncing[0] = True
+            z_slider.value = int(viewer.dims.current_step[0])
+            _syncing[0] = False
+
+    viewer.dims.events.current_step.connect(_on_dims_change)
+
+    info_w = Label(value="")
+
+    def _kept(m, t):
+        pred = m.preds.get(t.name)
+        if pred is None:
+            return None
+        thr = np.array([m.thresholds[c] for c in cls_names])
+        cls = pred[:, 3].astype(int)
+        return pred[pred[:, 4] >= thr[cls]]
+
+    def _format_info(t, shape):
+        lines = [f"Sample: {t.name}", f"Shape:  {shape}"]
+        for m in methods:
+            p = _kept(m, t)
+            if p is None:
+                lines.append(f"{m.name}: no predictions")
+                continue
+            cnt = np.bincount(p[:, 3].astype(int), minlength=len(cls_names))
+            lines.append(f"{m.name}: {len(p)} picks")
+            if len(cls_names) > 1:
+                lines.append("  " + ", ".join(f"{c} {n}" for c, n in zip(cls_names, cnt)))
+        lines.append("")
+        lines.append("Colours (class):")
+        lines += [f"  {CLASS_COLOR_NAMES[i % 6]}: {n}" for i, n in enumerate(cls_names)]
+        lines.append("Method layers (eye icon to toggle): "
+                     + ", ".join(f"{m.name} prediction" for m in methods))
+        lines.append("ground_truth layer: hidden")
+        return "\n".join(lines)
+
+    def _add_points(data_xyz, name, **kw):
         data = data_xyz[:, [2, 1, 0]] if len(data_xyz) else np.zeros((0, 3))
         if not len(data):
-            kw = {k: v for k, v in kw.items() if k in ("symbol", "opacity")}
+            kw = {k: v for k, v in kw.items() if k in ("symbol", "opacity", "visible")}
         try:    # napari >= 0.9: thick slices along Z, picks drawn as the sphere's cross-section
-            viewer.add_points(data, name=name, visible=visible, ndim=3,
-                              projection_mode="rescale_spherical", **kw)
+            viewer.add_points(data, name=name, ndim=3, projection_mode="rescale_spherical", **kw)
         except (TypeError, ValueError):     # older napari
-            viewer.add_points(data, name=name, visible=visible, ndim=3, out_of_slice_display=True, **kw)
+            viewer.add_points(data, name=name, ndim=3, out_of_slice_display=True, **kw)
 
-    def draw_points():
-        t = tomos[state["idx"]]
-        vs = t.voxel_size
-        lines = [f"{t.name}   voxel {vs:.3f} A   GT {len(t.gt)}"]
-
-        for mi, m in enumerate(methods):
-            sym = METHOD_SYMBOLS[mi % len(METHOD_SYMBOLS)]
-            pred = m.preds.get(t.name)
-            if pred is None:
-                lines.append(f"{m.name}: no predictions for this tomogram")
-                for suffix in (" picks", " missed"):
-                    replace_points(m.name + suffix, np.zeros((0, 3)), symbol=sym)
-                continue
-            status, hit, cnt = matcher.classify(pred, t.gt, vs, thresholds[m.name])
-            f, per = matcher.fbeta(cnt)
-            sel = class_filter(pred[:, 3])
-            if class_cb.value != "all":
-                ci = cls_names.index(class_cb.value)
-                cnt, f = cnt[ci:ci + 1], per[ci]
-            tp, fp, fn = cnt.sum(axis=0)
-            dup = int(np.sum((status == "dup") & sel))
-            lines.append(f"{m.name}: TP {tp}  FP {fp} (dup {dup})  FN {fn}  F{matcher.beta:g}={f:.3f}")
-
-            keep = class_filter(pred[:, 3]) & ((status != "below") | show_below.value)
-            p, st = pred[keep], status[keep]
-            pc = p[:, 3].astype(int)
-            replace_points(m.name + " picks", p[:, :3],
-                           size=[2 * display_radius_vox(c, vs) for c in pc],
-                           face_color=[STATUS_COLORS[s] for s in st], border_width=0,
-                           symbol=sym, opacity=0.5,
-                           features={"status": list(st), "class": [cls_names[c] for c in pc],
-                                     "score": p[:, 4]})
-            miss = (~hit) & class_filter(t.gt[:, 3])
-            mg = t.gt[miss]
-            mc = mg[:, 3].astype(int)
-            replace_points(m.name + " missed", mg[:, :3],
-                           size=[2.3 * display_radius_vox(c, vs) for c in mc],
-                           face_color="transparent", border_color=MISSED_COLOR, border_width=0.1,
-                           symbol="square", features={"class": [cls_names[c] for c in mc]})
-
-        # GT last so its rings sit on top of the picks
-        g = t.gt[class_filter(t.gt[:, 3])]
-        cls = g[:, 3].astype(int)
-        replace_points("GT", g[:, :3], size=[2 * display_radius_vox(c, vs) for c in cls],
-                       face_color="transparent", border_color=[CLASS_COLORS[c % 6] for c in cls],
-                       border_width=0.08, symbol="disc",
-                       features={"class": [cls_names[c] for c in cls]})
-        info.value = "\n".join(lines)
-
-    def sync_slider():
-        m = method_cb.value
-        cname = class_cb.value if class_cb.value != "all" else cls_names[-1]
-        state["syncing"] = True
-        thr_slider.value = float(np.clip(thresholds[m][cname], 0.0, 1.0))
-        thr_slider.label = f"Thr {cname}" if class_cb.value != "all" else "Thr (all classes)"
-        state["syncing"] = False
-
-    def on_thr(val):
-        if state["syncing"] or state["idx"] is None:
-            return
-        targets = cls_names if class_cb.value == "all" else [class_cb.value]
-        for c in targets:
-            thresholds[method_cb.value][c] = float(val)
-        draw_points()
-
-    def on_reset():
-        for m in methods:
-            thresholds[m.name] = dict(m.thresholds)
-        sync_slider()
-        draw_points()
-
-    def show(idx):
-        state["idx"] = idx
+    def _display_sample(idx):
+        current_idx[0] = idx
         t = tomos[idx]
         try:
             vol = load_volume_zyx(t.image_path)
         except FileNotFoundError:
-            info.value = f"{t.name}: image not found at {t.image_path} (use --image-root)"
+            info_w.value = f"{t.name}: image not found at {t.image_path} (use --image-root)"
             return
-        z = vol.shape[0]
-        z_spin.max = z - 1
-        sub = vol[::4, ::4, ::4]
-        lo, hi = np.percentile(sub, [1, 99])
-        if "image" in viewer.layers:
-            viewer.layers.remove("image")
-        kw = dict(name="image", colormap="gray", contrast_limits=(float(lo), float(hi)))
+        z_max = vol.shape[0]
+        z_mid = z_max // 2
+        z_slider.max = z_max - 1
+
+        viewer.layers.clear()
+
+        # Raw image (percentile contrast: raw tomograms are too noisy for min/max)
+        lo, hi = np.percentile(vol[::4, ::4, ::4], [1, 99])
+        kw = dict(name="image", colormap="gray", opacity=0.7, contrast_limits=(float(lo), float(hi)))
         try:    # keep the image a single slice when the Z margin below turns on thick slicing
             viewer.add_image(vol, projection_mode="none", **kw)
         except TypeError:
             viewer.add_image(vol, **kw)
-        viewer.layers.move(viewer.layers.index("image"), 0)
         # Z margin = largest particle radius, so a pick shows on every slice its sphere crosses
         if hasattr(viewer.dims, "margin_left"):
             r = max(display_radius_vox(c, t.voxel_size) for c in range(len(cls_names)))
             viewer.dims.margin_left = (r,) + tuple(viewer.dims.margin_left[1:])
             viewer.dims.margin_right = (r,) + tuple(viewer.dims.margin_right[1:])
-        draw_points()
-        viewer.dims.set_point(0, z // 2)
+
+        # Predictions, one layer per method
+        for mi, m in enumerate(methods):
+            p = _kept(m, t)
+            if p is None:
+                p = np.zeros((0, 5))
+            pc = p[:, 3].astype(int)
+            lname = "prediction" if len(methods) == 1 else f"{m.name} prediction"
+            _add_points(p[:, :3], lname,
+                        size=[2 * display_radius_vox(c, t.voxel_size) for c in pc],
+                        face_color=[CLASS_COLORS[c % len(CLASS_COLORS)] for c in pc],
+                        border_width=0, symbol="disc", opacity=0.5, visible=(mi == 0),
+                        features={"class": [cls_names[c] for c in pc], "score": p[:, 4]})
+
+        # Ground truth, hidden like the segmentation viewer's ground_truth layer
+        gc = t.gt[:, 3].astype(int)
+        _add_points(t.gt[:, :3], "ground_truth",
+                    size=[2 * display_radius_vox(c, t.voxel_size) for c in gc],
+                    face_color="transparent",
+                    border_color=[CLASS_COLORS[c % len(CLASS_COLORS)] for c in gc],
+                    border_width=0.08, symbol="disc", visible=False,
+                    features={"class": [cls_names[c] for c in gc]})
+
+        z_slider.value = z_mid
+        viewer.dims.set_point(0, z_mid)
         viewer.reset_view()
+        info_w.value = _format_info(t, vol.T.shape)
 
-    def on_dims(event=None):
-        if not state["syncing"]:
-            state["syncing"] = True
-            z_spin.value = int(viewer.dims.current_step[0])
-            state["syncing"] = False
+    @magicgui(call_button=False, sample={"choices": names, "label": "Sample"})
+    def nav_widget(sample: str = names[0]) -> None:
+        idx = names.index(sample)
+        if idx != current_idx[0]:
+            _display_sample(idx)
 
-    def on_z(val):
-        if not state["syncing"]:
-            state["syncing"] = True
-            viewer.dims.set_point(0, val)
-            state["syncing"] = False
+    nav_widget.sample.changed.connect(lambda val: nav_widget())
 
-    tomo_cb.changed.connect(lambda v: show(names.index(v)))
-    prev_btn.changed.connect(lambda: setattr(tomo_cb, "value", names[max(0, names.index(tomo_cb.value) - 1)]))
-    next_btn.changed.connect(lambda: setattr(tomo_cb, "value",
-                                             names[min(len(names) - 1, names.index(tomo_cb.value) + 1)]))
-    class_cb.changed.connect(lambda v: (sync_slider(), draw_points()))
-    method_cb.changed.connect(lambda v: sync_slider())
-    thr_slider.changed.connect(on_thr)
-    show_below.changed.connect(lambda v: draw_points())
-    reset_btn.changed.connect(on_reset)
-    z_spin.changed.connect(on_z)
-    viewer.dims.events.current_step.connect(on_dims)
+    @magicgui(call_button="Previous")
+    def prev_btn() -> None:
+        nav_widget.sample.value = names[max(0, current_idx[0] - 1)]
 
-    legend = Label(value="picks (filled): green TP, yellow dup (FP), red FP, grey below thr\n"
-                         "orange square: missed GT (FN); ring colour: GT class\n"
-                         "methods: " + ", ".join(f"{m.name}={METHOD_SYMBOLS[i % 4]}"
-                                                 for i, m in enumerate(methods)))
+    @magicgui(call_button="Next")
+    def next_btn() -> None:
+        nav_widget.sample.value = names[min(len(names) - 1, current_idx[0] + 1)]
+
     viewer.window.add_dock_widget(
-        Container(widgets=[tomo_cb, prev_btn, next_btn, z_spin, class_cb, method_cb, thr_slider,
-                           show_below, reset_btn, info, legend]),
-        name="Detection", area="right")
+        Container(widgets=[nav_widget, prev_btn, next_btn, z_slider, info_w]),
+        name="Navigation", area="right")
 
-    sync_slider()
-    show(0)
+    _display_sample(0)
     return viewer
 
 

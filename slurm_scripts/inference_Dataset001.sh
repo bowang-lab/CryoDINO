@@ -10,7 +10,7 @@
 #SBATCH --mem=220G
 #SBATCH --mail-user=attarpour1993@gmail.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Inference: Dataset001_CZII_10001 (4-class)
@@ -21,7 +21,7 @@ date; hostname; pwd; nvidia-smi
 
 source ~/.bashrc
 conda activate cryoet
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoET || exit 1
 
 CONFIG_FILE="3DINO/dinov2/configs/train/vit3d_highres.yaml"
 PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"

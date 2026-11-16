@@ -18,7 +18,7 @@ import sys
 import numpy as np
 import torch
 
-SRC = ("/home/cyyu/projects/def-wanglab-ab/cryodino/010/"
+SRC = ("/home/<USERNAME>/projects/def-wanglab-ab/cryodino/010/"
        "Dataset010_CZII_10010_train_patches_512")
 
 

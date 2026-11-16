@@ -8,7 +8,7 @@ compared against a CryoDINO segmentation head without any post-hoc reconciliatio
 Inference only -- training lives in membrain_kit/run_datalist.sh.
 
 Environment: run in the membrain venv (it needs `membrain_seg`), NOT the cryoet conda env:
-    module load python/3.11 && source /scratch/cyyu/venvs/membrain/bin/activate
+    module load python/3.11 && source /scratch/<USERNAME>/venvs/membrain/bin/activate
 
 Two input modes (identical to segmentation3d_inference.py):
   1. --datalist: a MONAI datalist JSON; the "test" split is used. Entries need an "image" key;
