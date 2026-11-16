@@ -24,7 +24,7 @@
 #   cryodino_last1 same as cryodino but the last ViT block is unfrozen (--train-last-n-blocks 1)
 #   random_init ViTAdapterUNETR, no weights (empty path -> build_model_for_eval falls back to
 #               random init), backbone trained (--train-feature-model, as in
-#               slurm_scripts/train_3dino_ft_random_init_patches.sh)
+#               slurm_scripts/train_segmentation.sh PRESET=random_init)
 #   resnetfpn   ResNet34-FPN from scratch; --pretrained-weights is ignored for this head
 #
 # Percent is selected by directory, not by --dataset-percent: each {czi,byu}_{10,50}percent/

@@ -96,12 +96,22 @@ Each run directory holds `results.json` (`test_f4`, `test_per_cls_f4`, `best_val
 
 ## DeepETPicker (baseline)
 
-Run: `PERCENT=<100|50|10> bash slurm_scripts/deepetpicker_czi.sh` (login node; submits train -> 20-checkpoint validation array -> select). Protocol and settings: `baselines/deepetpicker_kit/README.md`. The number to compare is `test_f4_at_val_thresholds` in `metrics_czi.json`.
+Run: `PERCENT=<100|50|10> bash slurm_scripts/deepetpicker_{czi,byu}.sh` (login node; submits train -> checkpoint validation array -> select). Protocol and settings: `baselines/deepetpicker_kit/README.md`. Reported number: test at the val-chosen checkpoint and threshold(s) (`test_f4_at_val_thresholds` / `test_f2_at_val_thresholds`).
 
-Each directory holds `metrics_czi.json`, `test/` (per-tomogram `*.coords` predictions), `validation/`, `_checkpoint.txt` and `_timing.json`.
+Each directory holds the metrics JSON, `test/` and `validation/` (per-tomogram `*.coords` predictions), `_checkpoint.txt` and `_timing.json`.
 
-| Split | Results |
-|---|---|
-| 100% | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/results/czii_100/` |
-| 50%  | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/results/czii_50/` |
-| 10%  | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/results/czii_10/` |
+### CZII (weighted F4, `metrics_czi.json`)
+
+| Split | Test F4 | Epoch | Results |
+|---|---|---|---|
+| 100% | 0.663 | 80 | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/results/czii_100/` |
+| 50%  | 0.623 | 15 | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/results/czii_50/` |
+| 10%  | 0.422 | 30 | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/results/czii_10/` |
+
+### BYU (F2 at 1000 Å, `metrics_byu_1000.json`)
+
+| Split | Test F2 | Epoch | Results |
+|---|---|---|---|
+| 100% | 0.618 | 85 | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/byu_bench_100_lab13_b128/predictions/version_0_periodic-epoch=84/` |
+| 50%  | 0.550 | 95 | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/byu_bench_50_lab13_b128_v2/predictions/version_0_periodic-epoch=94/` |
+| 10%  | 0.395 | 25 | `/cluster/projects/pmccaiteam/<USERNAME>/deepetpicker/byu_bench_10_lab13_b128_v2/predictions/version_0_periodic-epoch=24/` |

@@ -274,6 +274,14 @@ PYTHONPATH=. python dinov2/eval/segmentation3d.py \
   --resize-scale       1.0
 ```
 
+The runs reported in the paper are launched with `slurm_scripts/train_segmentation.sh` (one dataset per job, training followed by test-set inference) and submitted with `slurm_scripts/submit_segmentation.sh`, which sets memory and time per run:
+
+```bash
+# PRESET: h100_9374 | b200_112 | b200_128 | b200_best | b200_best_full | random_init (see the script header)
+bash slurm_scripts/submit_segmentation.sh b200_best "001 010 989 049" "50 10"            # print the sbatch commands
+bash slurm_scripts/submit_segmentation.sh b200_best "001 010 989 049" "50 10" --submit   # submit them
+```
+
 ---
 
 ## Detection Fine-tuning
@@ -394,7 +402,7 @@ CryoDINO is compared with the following baselines. Every baseline is trained and
 | Baseline | Task | Training | Inference / scoring |
 |---|---|---|---|
 | UNet, UNETR (MONAI, from scratch) | segmentation | `baselines/unet_unetr/train.py` | `baselines/unet_unetr/inference.py` |
-| CryoDINO random init (same ViT-Adapter + UNETR, no pre-training) | segmentation | `slurm_scripts/train_3dino_ft_random_init_patches*.sh` | `inference/segmentation3d_inference.py` |
+| CryoDINO random init (same ViT-Adapter + UNETR, no pre-training) | segmentation | `slurm_scripts/train_segmentation.sh` with `PRESET=random_init` | `inference/segmentation3d_inference.py` |
 | DeePiCt | segmentation | `baselines/deepict/` | `baselines/deepict_inference.py` |
 | MemBrain-seg (membrane class only) | segmentation | `baselines/membrain_kit/` | `baselines/membrain_inference.py` |
 | ResNet34-FPN (from scratch) | detection | `detection3d.py --segmentation-head ResNetFPN` | `detection3d.py` |
@@ -417,9 +425,9 @@ OMP_NUM_THREADS=1 PYTHONPATH=. python ../baselines/unet_unetr/train.py \
     --dataset_percent 100
 ```
 
-`slurm_scripts/train_baselines_patches.sh` (and the `_10pct` / `_50pct` versions) trains and evaluates both models on all four datasets; see the script for the schedule.
+`slurm_scripts/train_baselines.sh` trains and evaluates one model on one dataset (`MODEL`, `DATASET`, `PERCENT`); `bash slurm_scripts/submit_segmentation.sh baselines "" "100 50 10"` submits all of them.
 
-**CryoDINO random init** uses the same fine-tuning pipeline as CryoDINO with no pre-trained weights (`--pretrained-weights ""`) and a trainable backbone: `slurm_scripts/train_3dino_ft_random_init_patches.sh` (and the `_10pct` / `_50pct` versions).
+**CryoDINO random init** uses the same fine-tuning pipeline as CryoDINO with no pre-trained weights (`--pretrained-weights ""`) and a trainable backbone: `slurm_scripts/train_segmentation.sh` with `PRESET=random_init`.
 
 **DeePiCt** and **MemBrain-seg** are trained with their own kits, `baselines/deepict/` and `baselines/membrain_kit/` (see their READMEs; `run_datalist.sh` drives the full pipeline from a datalist, and `baselines/submit_deepict_*.sbatch` / `submit_membrain_*.sbatch` are the per-dataset SLURM jobs). MemBrain-seg is binary, so it is only evaluated on the membrane class.
 
