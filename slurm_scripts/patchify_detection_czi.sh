@@ -16,7 +16,7 @@
 # Detection patch generation (CZI)
 # Runs downstream_patch_generation.py in --detection mode:
 #   CSV point annotations → overlapping 128^3 .pt patches + czi_100_datalist.json
-# Run this before train_3dino_ft_h100_detection_czi.sh
+# Run this before slurm_scripts/train_detection.sh
 # =========================
 
 date

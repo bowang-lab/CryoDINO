@@ -68,8 +68,8 @@ Once: `bash setup.sh` (builds the venv and patches `$DEP`; `run_benchmark.sh` ap
 On H4H the submit scripts do the whole chain from the login node:
 
 ```bash
-PERCENT=100 bash slurm_scripts_detection/deepetpicker_czi.sh    # 100 | 50 | 10
-PERCENT=100 bash slurm_scripts_detection/deepetpicker_byu.sh
+PERCENT=100 bash slurm_scripts/deepetpicker_czi.sh    # 100 | 50 | 10
+PERCENT=100 bash slurm_scripts/deepetpicker_byu.sh
 ```
 
 or by hand (`DATASET`, `DATALIST`, `OUT` are required):
@@ -219,7 +219,7 @@ pass, below 5 epochs (one point per metric has no slope).
 
 On H4H the venv and checkout are `~/venvs/deepetpicker` + `~/deepetpicker/DeepETPicker`
 (the sbatch defaults), or Reza's under `/cluster/projects/pmccaiteam/reza/projects/cryoet/envs/`
-(torch 2.7.1 cu128; used by `slurm_scripts_detection/deepetpicker_*.sh`). Pass `DEP=` / `VENV=` to
+(torch 2.7.1 cu128; used by `slurm_scripts/deepetpicker_*.sh`). Pass `DEP=` / `VENV=` to
 `setup.sh` to build elsewhere.
 
 On Alliance, `setup.sh` builds `/scratch/cyyu/venvs/deepetpicker` (its default) from the wheelhouse

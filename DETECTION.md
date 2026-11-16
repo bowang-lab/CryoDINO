@@ -43,38 +43,38 @@ labels: "points" field in datalist
 
 ```bash
 # Frozen CryoDINO (ViT-Adapter + UNETR)
-sbatch -J det-cryodino-czi-$P -t 3-00:00:00 --mem=76G --cpus-per-task=12 --export=ALL,METHOD=cryodino,DATASET=czi,PERCENT=$P,NUM_WORKERS=8 slurm_scripts_detection/train_detection.sh
+sbatch -J det-cryodino-czi-$P -t 3-00:00:00 --mem=76G --cpus-per-task=12 --export=ALL,METHOD=cryodino,DATASET=czi,PERCENT=$P,NUM_WORKERS=8 slurm_scripts/train_detection.sh
 
 # Random init (ViT-Adapter + UNETR, trained from scratch)
-sbatch -J det-random_init-czi-$P -t 3-00:00:00 --mem=76G --cpus-per-task=12 --export=ALL,METHOD=random_init,DATASET=czi,PERCENT=$P,NUM_WORKERS=8 slurm_scripts_detection/train_detection.sh
+sbatch -J det-random_init-czi-$P -t 3-00:00:00 --mem=76G --cpus-per-task=12 --export=ALL,METHOD=random_init,DATASET=czi,PERCENT=$P,NUM_WORKERS=8 slurm_scripts/train_detection.sh
 
 # ResNet34-FPN from scratch
-sbatch -J det-resnetfpn-czi-$P -t 3-00:00:00 --mem=76G --cpus-per-task=12 --export=ALL,METHOD=resnetfpn,DATASET=czi,PERCENT=$P,NUM_WORKERS=8 slurm_scripts_detection/train_detection.sh
+sbatch -J det-resnetfpn-czi-$P -t 3-00:00:00 --mem=76G --cpus-per-task=12 --export=ALL,METHOD=resnetfpn,DATASET=czi,PERCENT=$P,NUM_WORKERS=8 slurm_scripts/train_detection.sh
 
 # Frozen + LoRA r16 (qkv, proj), lr 1e-4
-sbatch -J det-cryodino-czi-$P-lora16 -t 3-00:00:00 --mem=90G --cpus-per-task=12 --exclude=node164 --export=ALL,METHOD=cryodino,DATASET=czi,PERCENT=$P,NUM_WORKERS=8,LEARNING_RATE=1e-4,LORA_RANK=16,LORA_LR=1e-4 slurm_scripts_detection/train_detection_hyp.sh
+sbatch -J det-cryodino-czi-$P-lora16 -t 3-00:00:00 --mem=90G --cpus-per-task=12 --exclude=node164 --export=ALL,METHOD=cryodino,DATASET=czi,PERCENT=$P,NUM_WORKERS=8,LEARNING_RATE=1e-4,LORA_RANK=16,LORA_LR=1e-4 slurm_scripts/train_detection_hyp.sh
 
 # Frozen + adapter_fpn, lr 1e-3, grad clip 3.0
-sbatch -J det-cryodino-czi-$P-afpn-clip -t 3-00:00:00 --mem=90G --cpus-per-task=12 --exclude=node164 --export=ALL,METHOD=cryodino,DATASET=czi,PERCENT=$P,NUM_WORKERS=8,DECODER_FUSION=adapter_fpn,LEARNING_RATE=1e-3,CLIP_GRAD=3.0 slurm_scripts_detection/train_detection_hyp.sh
+sbatch -J det-cryodino-czi-$P-afpn-clip -t 3-00:00:00 --mem=90G --cpus-per-task=12 --exclude=node164 --export=ALL,METHOD=cryodino,DATASET=czi,PERCENT=$P,NUM_WORKERS=8,DECODER_FUSION=adapter_fpn,LEARNING_RATE=1e-3,CLIP_GRAD=3.0 slurm_scripts/train_detection_hyp.sh
 ```
 
 100% only:
 
 ```bash
 # Last ViT block unfrozen
-sbatch -J det-cryodino_last1-czi-100 -t 3-00:00:00 --mem=76G --cpus-per-task=12 --export=ALL,METHOD=cryodino_last1,DATASET=czi,PERCENT=100,NUM_WORKERS=8 slurm_scripts_detection/train_detection.sh
+sbatch -J det-cryodino_last1-czi-100 -t 3-00:00:00 --mem=76G --cpus-per-task=12 --export=ALL,METHOD=cryodino_last1,DATASET=czi,PERCENT=100,NUM_WORKERS=8 slurm_scripts/train_detection.sh
 
 # Full fine-tune, lr 1e-4
-sbatch -J det-cryodino_ft-czi-100 -t 3-00:00:00 --mem=280G --cpus-per-task=32 --export=ALL,METHOD=cryodino_ft,DATASET=czi,PERCENT=100,NUM_WORKERS=24 slurm_scripts_detection/train_detection.sh
+sbatch -J det-cryodino_ft-czi-100 -t 3-00:00:00 --mem=280G --cpus-per-task=32 --export=ALL,METHOD=cryodino_ft,DATASET=czi,PERCENT=100,NUM_WORKERS=24 slurm_scripts/train_detection.sh
 
 # Full fine-tune, lr 1e-5
-sbatch -J det-cryodino_ft-czi-100-lr1e-5 -t 3-00:00:00 --mem=280G --cpus-per-task=32 --export=ALL,METHOD=cryodino_ft,DATASET=czi,PERCENT=100,NUM_WORKERS=24,LEARNING_RATE=1e-5 slurm_scripts_detection/train_detection_hyp.sh
+sbatch -J det-cryodino_ft-czi-100-lr1e-5 -t 3-00:00:00 --mem=280G --cpus-per-task=32 --export=ALL,METHOD=cryodino_ft,DATASET=czi,PERCENT=100,NUM_WORKERS=24,LEARNING_RATE=1e-5 slurm_scripts/train_detection_hyp.sh
 
 # Frozen, lr 1e-5
-sbatch -J det-cryodino-czi-100-lr1e-5 -t 3-00:00:00 --mem=76G --cpus-per-task=12 --export=ALL,METHOD=cryodino,DATASET=czi,PERCENT=100,NUM_WORKERS=8,LEARNING_RATE=1e-5 slurm_scripts_detection/train_detection_hyp.sh
+sbatch -J det-cryodino-czi-100-lr1e-5 -t 3-00:00:00 --mem=76G --cpus-per-task=12 --export=ALL,METHOD=cryodino,DATASET=czi,PERCENT=100,NUM_WORKERS=8,LEARNING_RATE=1e-5 slurm_scripts/train_detection_hyp.sh
 
 # Frozen + adapter_fpn, lr 1e-4
-sbatch -J det-cryodino-czi-100-adapter_fpn -t 3-00:00:00 --mem=190G --cpus-per-task=28 --export=ALL,METHOD=cryodino,DATASET=czi,PERCENT=100,NUM_WORKERS=20,LEARNING_RATE=1e-4,DECODER_FUSION=adapter_fpn slurm_scripts_detection/train_detection_hyp.sh
+sbatch -J det-cryodino-czi-100-adapter_fpn -t 3-00:00:00 --mem=190G --cpus-per-task=28 --export=ALL,METHOD=cryodino,DATASET=czi,PERCENT=100,NUM_WORKERS=20,LEARNING_RATE=1e-4,DECODER_FUSION=adapter_fpn slurm_scripts/train_detection_hyp.sh
 ```
 
 ## Outputs (test results)
@@ -96,7 +96,7 @@ Each run directory holds `results.json` (`test_f4`, `test_per_cls_f4`, `best_val
 
 ## DeepETPicker (baseline)
 
-Run: `PERCENT=<100|50|10> bash slurm_scripts_detection/deepetpicker_czi.sh` (login node; submits train -> 20-checkpoint validation array -> select). Protocol and settings: `baselines/deepetpicker_kit/README.md`. The number to compare is `test_f4_at_val_thresholds` in `metrics_czi.json`.
+Run: `PERCENT=<100|50|10> bash slurm_scripts/deepetpicker_czi.sh` (login node; submits train -> 20-checkpoint validation array -> select). Protocol and settings: `baselines/deepetpicker_kit/README.md`. The number to compare is `test_f4_at_val_thresholds` in `metrics_czi.json`.
 
 Each directory holds `metrics_czi.json`, `test/` (per-tomogram `*.coords` predictions), `validation/`, `_checkpoint.txt` and `_timing.json`.
 

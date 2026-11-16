@@ -11,7 +11,7 @@
 #     t=$(sbatch --parsable --export=$E submit_h4h_bench_train.sbatch)
 #     c=$(sbatch --parsable --dependency=afterok:$t --array=0-19%4 --export=$E submit_h4h_bench_ckpt.sbatch)
 #     sbatch --dependency=afterok:$c --export=$E submit_h4h_bench_select.sbatch      (BYU: add CHUNK=2)
-#   slurm_scripts_detection/deepetpicker_{czi,byu}.sh submit exactly this.
+#   slurm_scripts/deepetpicker_{czi,byu}.sh submit exactly this.
 #   smoke: add EPOCHS=1 to E (and LIMIT=4 for the ckpt/select jobs)
 #SBATCH --job-name=dep_bench_train
 #SBATCH -p gpu_pmccaiteam

@@ -13,7 +13,7 @@
 # =========================
 # Baseline: MONAI RetinaNet 3D (ResNet-FPN, from scratch) — DETECTION (CZI)
 # Validated/tested with the CryoDINO metric (CZIDetectionMetrics, Kaggle CZII F4) so it is
-# directly comparable to train_3dino_ft_h100_detection_czi.sh.
+# directly comparable to slurm_scripts/train_detection.sh.
 #
 # Key differences vs detection3d.py:
 #   * No DINO backbone / config / pretrained weights.
