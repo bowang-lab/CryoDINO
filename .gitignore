@@ -226,3 +226,4 @@ downstream/
 dataset/
 manuscript/
 .DS_Store
+!assets/*.png
