@@ -13,7 +13,6 @@
 ##SBATCH --mail-type=ALL
 #SBATCH --output=slurm_logs/%x_%j.log
 set -euo pipefail
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 
 date
 hostname
@@ -23,8 +22,8 @@ BASELINES_DIR="/cluster/home/$USER/scripts/cryoet/CryoDINO/baselines"
 KIT_DIR="$BASELINES_DIR/membrain_kit"
 VENV="$KIT_DIR/venv"
 
-DATALIST="${CRYOET_ROOT}/experiments/Dataset010_CZII_10010_patches512_100_datalist.json"
-OUT="${CRYOET_ROOT}/experiments/baselines_out/membrain_ds010_100pct_rerun"
+DATALIST="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/Dataset010_CZII_10010_patches512_100_datalist.json"
+OUT="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/baselines_out/membrain_ds010_100pct_rerun"
 mkdir -p "$OUT"
 
 EPOCHS=100 ITERS=300 VENV="$VENV" bash "$KIT_DIR/run_datalist.sh" "$DATALIST" "$OUT"

@@ -29,7 +29,6 @@
 # Each run writes results.json + best_model.pth to its OUTPUT_DIR (plot from those).
 # =========================
 
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 date; hostname; pwd; nvidia-smi
 
 source ~/.bashrc
@@ -40,7 +39,7 @@ cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 CONFIG_DEFAULT="dinov2/configs/ssl3d_default_config.yaml"       # global_crops_size 96
 CONFIG_HIGHRES_112="dinov2/configs/train/vit3d_highres_112.yaml" # global_crops_size 112
 CONFIG_HIGHRES="dinov2/configs/train/vit3d_highres.yaml"        # global_crops_size 128
-EXP="${CRYOET_ROOT}/experiments"
+EXP="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments"
 
 # Runs:  label | run_dir | config | image_size | ckpt_iter (optional)
 # ckpt_iter: if set, use ONLY eval/training_<iter>/teacher_checkpoint.pth; if empty,

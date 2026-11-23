@@ -20,14 +20,13 @@
 # The test set is always the full 100% datalist; 50%/10% only subsample training.
 # =========================
 set -euo pipefail
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 : "${MODEL:?set MODEL (unet | unetr)}"
 : "${DATASET:?set DATASET (001 | 010 | 989 | 049)}"
 : "${PERCENT:=100}"
 case "$MODEL" in unet|unetr) ;; *) echo "Unknown MODEL: $MODEL"; exit 1 ;; esac
 
 REPO="${REPO:-/cluster/home/$USER/scripts/cryoet/CryoDINO}"
-EXP="${EXP:-${CRYOET_ROOT}/experiments}"
+EXP="${EXP:-/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments}"
 BASE_DATA_DIR="$EXP"
 CACHE_DIR_BASE="$EXP/cache_dir_downstream"
 OUTPUT_BASE="$EXP/baselines"

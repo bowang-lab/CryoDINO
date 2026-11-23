@@ -19,7 +19,6 @@
 # Run this before slurm_scripts/train_detection.sh
 # =========================
 
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 date
 hostname
 pwd
@@ -32,8 +31,8 @@ cd /cluster/home/$USER/scripts/cryoet/CryoDINO || exit 1
 # =========================
 # Paths
 # =========================
-DETECTION_BASE="${CRYOET_ROOT}/datasets/downstream_detection"
-BASE_DATA_DIR="${CRYOET_ROOT}/experiments"
+DETECTION_BASE="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream_detection"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments"
 
 # Raw CZI detection dataset (image NIfTIs + CSV point annotations + split datalist)
 CZI_SPLIT_DATALIST="${DETECTION_BASE}/czi_dataset/Dataset440_CZII_10440/czi_split_datalist.json"

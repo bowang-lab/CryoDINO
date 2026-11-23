@@ -22,7 +22,6 @@
 #SBATCH --output=slurm_logs/%x_%j.log
 # No `set -e`: a failure in one dataset is reported and the loop moves on to the next one.
 set -uo pipefail
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 
 date
 hostname
@@ -32,7 +31,7 @@ BASELINES_DIR="/cluster/home/$USER/scripts/cryoet/CryoDINO/baselines"
 KIT_DIR="$BASELINES_DIR/deepict"
 DEEPICT="$KIT_DIR/DeePiCt"
 VENV="$KIT_DIR/venv"
-EXP="${CRYOET_ROOT}/experiments"
+EXP="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments"
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate cryodino

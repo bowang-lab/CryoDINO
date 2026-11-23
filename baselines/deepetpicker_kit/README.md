@@ -218,7 +218,7 @@ pass, below 5 epochs (one point per metric has no slope).
 ## Environment
 
 On H4H the venv and checkout are `~/venvs/deepetpicker` + `~/deepetpicker/DeepETPicker`
-(the sbatch defaults), or Reza's under `$CRYOET_ROOT/envs/`
+(the sbatch defaults), or Reza's under `/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/envs/`
 (torch 2.7.1 cu128; used by `slurm_scripts/deepetpicker_*.sh`). Pass `DEP=` / `VENV=` to
 `setup.sh` to build elsewhere.
 

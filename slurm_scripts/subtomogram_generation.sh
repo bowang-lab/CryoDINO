@@ -11,7 +11,6 @@
 ##SBATCH --mail-type=ALL
 #SBATCH --output=slurm_logs/%x_%j.log
 
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 date
 hostname
 pwd
@@ -22,17 +21,17 @@ conda activate cryoet
 cd /cluster/home/$USER/scripts/cryoet/CryoET/preprocessing
 
 # python subtomograms_generation.py \
-#   -i ${CRYOET_ROOT}/datasets/10442_imagesTr \
-#   -o ${CRYOET_ROOT}/datasets/10442_imagesTr_subtomograms \
-#   -m ${CRYOET_ROOT}/datasets/otsu_masks/otsu_deconv
+#   -i /cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/10442_imagesTr \
+#   -o /cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/10442_imagesTr_subtomograms \
+#   -m /cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/otsu_masks/otsu_deconv
 
 # python subtomograms_generation.py \
-#   -i ${CRYOET_ROOT}/datasets/10443_imagesTr \
-#   -o ${CRYOET_ROOT}/datasets/10443_imagesTr_subtomograms \
-#   -m ${CRYOET_ROOT}/datasets/otsu_masks/otsu_deconv
+#   -i /cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/10443_imagesTr \
+#   -o /cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/10443_imagesTr_subtomograms \
+#   -m /cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/otsu_masks/otsu_deconv
 
-NEW_BASE="${CRYOET_ROOT}/datasets/upload/nifti_unannotated_10476_10479_10493_06232026"
-SUBTOMO_BASE="${CRYOET_ROOT}/datasets/nifti_unannotated_10476_10479_10493_06232026_subtomograms"
+NEW_BASE="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/upload/nifti_unannotated_10476_10479_10493_06232026"
+SUBTOMO_BASE="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/nifti_unannotated_10476_10479_10493_06232026_subtomograms"
 
 python subtomograms_generation.py \
   -i "${NEW_BASE}/10476/imagesTr" \

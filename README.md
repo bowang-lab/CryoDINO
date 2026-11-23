@@ -135,14 +135,7 @@ pip install -r requirements_cryodino.txt
 
 > **GPU memory:** Pretraining was run on 4× B200 (183 GB each); the earlier runs used 4× H100-80GB. Fine-tuning and inference run on a single GPU (200 GB RAM recommended).
 
-**Running the SLURM scripts.** The scripts in `slurm_scripts/` and `baselines/` read the data location from one environment variable, `CRYOET_ROOT`: the folder that holds `datasets/` and `experiments/`. Set it once, and submit from the repository root so logs land in `slurm_logs/`:
-
-```bash
-export CRYOET_ROOT=/path/to/cryoet
-sbatch slurm_scripts/<script>.sh
-```
-
-The remaining placeholders are `<USERNAME>` (shared environments and result folders) and `<YOUR_EMAIL>` (job notifications: remove one `#` from the `##SBATCH --mail-*` lines to turn them on). The two YAML configs in `3DINO/dinov2/configs/` use `<CRYOET_ROOT>` for their default paths.
+**Running the SLURM scripts.** The scripts in `slurm_scripts/` and `baselines/` are the jobs we ran on our cluster: they call the Python entry points shown in this README with our settings filled in. Before reusing one, replace the placeholders: `<USERNAME>` in paths (data, experiments, environments) and `<YOUR_EMAIL>` in the `##SBATCH --mail-*` lines (remove one `#` to turn job emails on). Submit from the repository root so logs land in `slurm_logs/`.
 
 ---
 

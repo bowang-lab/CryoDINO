@@ -5,8 +5,8 @@ Run from `/cluster/home/<USERNAME>/projects/CryoDINO` on `uhn-login`.
 ## Paths
 
 ```
-DATA=$CRYOET_ROOT/datasets/downstream_detection
-OUT=$CRYOET_ROOT/experiments/finetuning_detection
+DATA=/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream_detection
+OUT=/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/finetuning_detection
 ```
 
 ### Datalists (image + point labels, keys: training / validation / test)

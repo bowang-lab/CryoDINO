@@ -16,7 +16,6 @@
 ##SBATCH --mail-type=ALL
 #SBATCH --output=slurm_logs/%x_%j.log
 set -euo pipefail
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 
 date
 hostname
@@ -27,8 +26,8 @@ KIT_DIR="$BASELINES_DIR/deepict"
 DEEPICT="$KIT_DIR/DeePiCt"
 VENV="$KIT_DIR/venv"
 
-DATALIST="${CRYOET_ROOT}/experiments/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
-OUT="${CRYOET_ROOT}/experiments/baselines_out/deepict_ds989"
+DATALIST="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/Dataset989_EMPIAR_10989_transposed_patches512_100_datalist.json"
+OUT="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/baselines_out/deepict_ds989"
 mkdir -p "$OUT"
 cd "$OUT"
 

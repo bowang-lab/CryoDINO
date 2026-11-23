@@ -25,7 +25,6 @@
 # plotting later.
 # =========================
 
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 date; hostname; pwd; nvidia-smi
 
 source ~/.bashrc
@@ -33,7 +32,7 @@ conda activate cryodino
 
 cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
-EXP="${CRYOET_ROOT}/experiments"
+EXP="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments"
 CONFIG_FILE="dinov2/configs/train/vit3d_highres_112.yaml"
 PRETRAINED_WEIGHTS="${EXP}/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
 IMAGE_SIZE=112

@@ -18,7 +18,6 @@
 ##SBATCH --mail-type=ALL
 #SBATCH --output=slurm_logs/%x_%j.log
 set -euo pipefail
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 
 date
 hostname
@@ -29,8 +28,8 @@ KIT_DIR="$BASELINES_DIR/membrain_kit"
 VENV="$KIT_DIR/venv"
 TARGET_CLASS=2   # Dataset049's membranes are raw label value 2 (pre-remap)
 
-DATALIST="${CRYOET_ROOT}/experiments/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist.json"
-OUT="${CRYOET_ROOT}/experiments/baselines_out/membrain_ds049"
+DATALIST="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/Dataset049_EMPIAR_12049_transposed_patches512_100_datalist.json"
+OUT="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/baselines_out/membrain_ds049"
 mkdir -p "$OUT"
 
 EPOCHS=100 ITERS=300 VENV="$VENV" TARGET_CLASS="$TARGET_CLASS" \

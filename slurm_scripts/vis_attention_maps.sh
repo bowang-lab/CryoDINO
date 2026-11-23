@@ -21,7 +21,6 @@
 #   ScaleIntensityRangePercentiles(0.5-99.5) inside sliding window
 # =========================
 
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 date
 hostname
 nvidia-smi
@@ -37,9 +36,9 @@ cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 # and IMAGE_SIZE to 128)
 # =========================
 CONFIG="dinov2/configs/train/vit3d_highres_112.yaml"
-WEIGHTS="${CRYOET_ROOT}/experiments/ssl3d_run_b200_high_res/eval/training_6249/teacher_checkpoint.pth"
-IMG_DIR="${CRYOET_ROOT}/experiments/attention_maps/imgs"
-OUT_BASE="${CRYOET_ROOT}/experiments/attention_maps/vis_output"
+WEIGHTS="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/ssl3d_run_b200_high_res/eval/training_6249/teacher_checkpoint.pth"
+IMG_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/attention_maps/imgs"
+OUT_BASE="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/attention_maps/vis_output"
 IMAGE_SIZE=112
 
 SAMPLES=("TS_0001_0000" "TS_0009_0000" "TS_027_0000")

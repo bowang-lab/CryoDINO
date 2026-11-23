@@ -2,13 +2,12 @@
 # Inspect all detection datasets and save stats JSON to finetuning_detection dir
 # Usage: bash slurm_scripts/inspect_detection_datasets.sh
 
-: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 source ~/.bashrc
 conda activate cryoet
 
 SCRIPT="/cluster/home/$USER/scripts/cryoet/CryoET/dataset/downstream/inspect_dataset.py"
-DETECTION_BASE="${CRYOET_ROOT}/datasets/downstream_detection"
-OUTPUT_DIR="${CRYOET_ROOT}/experiments/finetuning_detection"
+DETECTION_BASE="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream_detection"
+OUTPUT_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/finetuning_detection"
 
 mkdir -p "$OUTPUT_DIR"
 
