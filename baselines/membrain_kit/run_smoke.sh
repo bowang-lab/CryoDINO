@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=00:30:00
-#SBATCH --output=%x-%j.out
+#SBATCH --output=slurm_logs/%x-%j.out
 VENV=/path/to/venv                   # your membrain-seg virtualenv
 DATA_DIR=/path/to/Dataset_membrain   # imagesTr/labelsTr/imagesVal/labelsVal
 KIT_DIR=/path/to/membrain_kit        # folder containing train_membrain.py

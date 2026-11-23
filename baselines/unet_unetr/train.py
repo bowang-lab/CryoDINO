@@ -1,4 +1,4 @@
-# Author: Ahmadreza Attarpour (attarpour1993@gmail.com)
+# Author: Ahmadreza Attarpour
 #
 # Baseline segmentation training script for CryoDINO evaluation.
 # Trains MONAI UNet or UNETR from scratch (random initialization) on cryo-ET datasets
@@ -21,9 +21,9 @@
 #   PYTHONPATH=. python ../baselines/train.py \
 #       --model_name unet \                         # or "unetr"
 #       --dataset_name Dataset001_CZII_10001_patches512 \
-#       --base_data_dir /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments \
-#       --output_dir /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines/unet_Dataset001 \
-#       --cache_dir /cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir_downstream/baseline_Dataset001 \
+#       --base_data_dir $CRYOET_ROOT/experiments \
+#       --output_dir $CRYOET_ROOT/experiments/baselines/unet_Dataset001 \
+#       --cache_dir $CRYOET_ROOT/experiments/cache_dir_downstream/baseline_Dataset001 \
 #       --image_size 112 \
 #       --epochs 100 \
 #       --epoch_length 300 \

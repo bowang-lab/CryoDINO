@@ -8,9 +8,9 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=700G
-#SBATCH --mail-user=attarpour1993@gmail.com
-#SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
+##SBATCH --mail-user=<YOUR_EMAIL>
+##SBATCH --mail-type=ALL
+#SBATCH --output=slurm_logs/%x_%j.log
 
 # =========================
 # H100 linear probing, pinned to its KNOWN BEST checkpoint (training_9374, the
@@ -25,6 +25,7 @@
 # plotting later.
 # =========================
 
+: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 date; hostname; pwd; nvidia-smi
 
 source ~/.bashrc
@@ -32,7 +33,7 @@ conda activate cryodino
 
 cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
-EXP="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+EXP="${CRYOET_ROOT}/experiments"
 CONFIG_FILE="dinov2/configs/train/vit3d_highres_112.yaml"
 PRETRAINED_WEIGHTS="${EXP}/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
 IMAGE_SIZE=112

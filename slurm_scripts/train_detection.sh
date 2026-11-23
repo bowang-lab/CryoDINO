@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=400G
-#SBATCH --output=/cluster/home/%u/projects/logs/%x_%j.log
+#SBATCH --output=slurm_logs/%x_%j.log
 
 # =========================
 # Detection benchmark: one (method, dataset, percent) run of dinov2/eval/detection3d.py.
@@ -34,6 +34,7 @@
 # =========================
 
 set -u
+: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 : "${METHOD:?set METHOD}" "${DATASET:?set DATASET}" "${PERCENT:?set PERCENT}"
 
 date
@@ -59,8 +60,8 @@ cd /cluster/home/$USER/projects/CryoDINO/3DINO || exit 1
 # =========================
 # Paths
 # =========================
-DETECTION_ROOT="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
-EXPERIMENTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+DETECTION_ROOT="${CRYOET_ROOT}/datasets/downstream_detection"
+EXPERIMENTS="${CRYOET_ROOT}/experiments"
 BASE_OUTPUT_DIR="${EXPERIMENTS}/finetuning_detection"
 CACHE_DIR_BASE="${EXPERIMENTS}/cache_dir_downstream_detection"
 B200_WEIGHTS="${EXPERIMENTS}/ssl3d_run_b200_high_res_128/eval/training_6249/teacher_checkpoint.pth"

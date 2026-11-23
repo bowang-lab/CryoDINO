@@ -1,0 +1,52 @@
+#!/bin/bash
+# End-to-end DeePiCt baseline on DS010, from the existing MONAI datalist JSON.
+# One-time setup (run on a login node with internet, see baselines/README notes) must be
+# done first: clone+patch DeePiCt (setup.sh) and build deepict/venv. Then:
+# sbatch submit_deepict_ds010.sbatch
+#SBATCH --job-name=deepict_ds010
+#SBATCH -p gpu_pmccaiteam
+#SBATCH --account=pmccaiteam_gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=400G
+#SBATCH --time=30:00:00
+##SBATCH --mail-user=<YOUR_EMAIL>
+##SBATCH --mail-type=ALL
+#SBATCH --output=slurm_logs/%x_%j.log
+set -euo pipefail
+: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
+
+date
+hostname
+nvidia-smi -L || true
+
+BASELINES_DIR="/cluster/home/$USER/scripts/cryoet/CryoDINO/baselines"
+KIT_DIR="$BASELINES_DIR/deepict"
+DEEPICT="$KIT_DIR/DeePiCt"
+VENV="$KIT_DIR/venv"
+
+DATALIST="${CRYOET_ROOT}/experiments/Dataset010_CZII_10010_patches512_100_datalist.json"
+OUT="${CRYOET_ROOT}/experiments/baselines_out/deepict_ds010_200ep"
+mkdir -p "$OUT"
+cd "$OUT"
+
+EPOCHS=200 ITERS=300 DEEPICT="$DEEPICT" VENV="$VENV" BINARY=1 bash "$KIT_DIR/run_datalist.sh" "$DATALIST" "$OUT"
+
+echo "Done: $OUT"
+
+echo "=== Scoring with CryoDINO-schema metrics (deepict_inference.py) ==="
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate cryodino
+source "$VENV/bin/activate"
+
+python "$BASELINES_DIR/deepict_inference.py" \
+  --model-path   "$OUT/out/model_best.pth" \
+  --train-config "$OUT/config.yaml" \
+  --deepict-root "$DEEPICT" \
+  --datalist     "$DATALIST" \
+  --output-dir   "$OUT/cryodino_metrics" \
+  --threshold    0.5 \
+  --cpu-metrics
+
+echo "Done: $OUT/cryodino_metrics"
+date

@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=220G
-#SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=slurm_logs/%x_%j.log
 
 # =========================
 # Baseline: MONAI RetinaNet 3D (ResNet-FPN, from scratch) — DETECTION (CZI)
@@ -24,6 +24,7 @@
 #     with preprocessing/make_detection_split.py if the paths differ.
 # =========================
 
+: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 date
 hostname
 pwd
@@ -43,12 +44,12 @@ SCRIPT_DIR="$BASELINES_DIR/detection3d_monai"
 # =========================
 # Paths
 # =========================
-DATA_ROOT="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
+DATA_ROOT="${CRYOET_ROOT}/datasets/downstream_detection"
 DATALIST="${DATA_ROOT}/Dataset440_CZII_10440_detection_patches_128/honest-split_datalist.json"
 IMAGES_DIR="${DATA_ROOT}/Dataset440_CZII_10440/imagesTr"
 ANNOTATIONS_CSV="${DATA_ROOT}/Dataset440_CZII_10440/point_annotations.csv"
-BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/finetuning_detection"
-CACHE_DIR_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/cache_dir_downstream_detection"
+BASE_OUTPUT_DIR="${CRYOET_ROOT}/datasets/finetuning_detection"
+CACHE_DIR_BASE="${CRYOET_ROOT}/datasets/cache_dir_downstream_detection"
 
 # =========================
 # Fixed Parameters

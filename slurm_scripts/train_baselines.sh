@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=220G
-#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=slurm_logs/%x_%j.log
 
 # =========================
 # Segmentation baselines: UNet or UNETR from random initialization (baselines/unet_unetr/train.py,
@@ -20,13 +20,14 @@
 # The test set is always the full 100% datalist; 50%/10% only subsample training.
 # =========================
 set -euo pipefail
+: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 : "${MODEL:?set MODEL (unet | unetr)}"
 : "${DATASET:?set DATASET (001 | 010 | 989 | 049)}"
 : "${PERCENT:=100}"
 case "$MODEL" in unet|unetr) ;; *) echo "Unknown MODEL: $MODEL"; exit 1 ;; esac
 
 REPO="${REPO:-/cluster/home/$USER/scripts/cryoet/CryoDINO}"
-EXP="${EXP:-/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments}"
+EXP="${EXP:-${CRYOET_ROOT}/experiments}"
 BASE_DATA_DIR="$EXP"
 CACHE_DIR_BASE="$EXP/cache_dir_downstream"
 OUTPUT_BASE="$EXP/baselines"

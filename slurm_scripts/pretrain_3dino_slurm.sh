@@ -8,14 +8,15 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=120
 #SBATCH --mem=800G
-#SBATCH --mail-user=attarpour1993@gmail.com
-#SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
+##SBATCH --mail-user=<YOUR_EMAIL>
+##SBATCH --mail-type=ALL
+#SBATCH --output=slurm_logs/%x_%j.log
 
 # for a100 GPUs: --cpus-per-task=120, --mem=6000G, num_workers=28
 # for b200 GPUs: --cpus-per-task=120, --mem=450G, num_workers=28
 
 
+: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 date
 hostname
 pwd
@@ -33,10 +34,10 @@ cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
 CONFIG_FILE="dinov2/configs/ssl3d_default_config.yaml"
 CONFIG_FILE_HIGH_RES="dinov2/configs/train/vit3d_highres.yaml"
-OUTPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200"
-OUTPUT_DIR_HIGH_REZ="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res"
-OUTPUT_DIR_HIGH_REZ_128="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res_128"
-CACHE_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/cache_dir"
+OUTPUT_DIR="${CRYOET_ROOT}/experiments/ssl3d_run_b200"
+OUTPUT_DIR_HIGH_REZ="${CRYOET_ROOT}/experiments/ssl3d_run_b200_high_res"
+OUTPUT_DIR_HIGH_REZ_128="${CRYOET_ROOT}/experiments/ssl3d_run_b200_high_res_128"
+CACHE_DIR="${CRYOET_ROOT}/experiments/cache_dir"
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR_HIGH_REZ"

@@ -8,9 +8,9 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=220G
-#SBATCH --mail-user=attarpour1993@gmail.com
-#SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
+##SBATCH --mail-user=<YOUR_EMAIL>
+##SBATCH --mail-type=ALL
+#SBATCH --output=slurm_logs/%x_%j.log
 
 # =========================
 # Detection patch generation (CZI)
@@ -19,6 +19,7 @@
 # Run this before slurm_scripts/train_detection.sh
 # =========================
 
+: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 date
 hostname
 pwd
@@ -31,8 +32,8 @@ cd /cluster/home/$USER/scripts/cryoet/CryoDINO || exit 1
 # =========================
 # Paths
 # =========================
-DETECTION_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
-BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+DETECTION_BASE="${CRYOET_ROOT}/datasets/downstream_detection"
+BASE_DATA_DIR="${CRYOET_ROOT}/experiments"
 
 # Raw CZI detection dataset (image NIfTIs + CSV point annotations + split datalist)
 CZI_SPLIT_DATALIST="${DETECTION_BASE}/czi_dataset/Dataset440_CZII_10440/czi_split_datalist.json"

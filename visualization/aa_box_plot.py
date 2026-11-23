@@ -1,5 +1,5 @@
 """
-This code is written by Ahmadreza Attarpour (a.attarpour@mail.utoronto.ca) 
+This code is written by Ahmadreza Attarpour 
 It recieves the inputs from user without a any flag
 the inputs should be .pickle files containing dice, recall, prec, f1, and hd for multiple image patches
 

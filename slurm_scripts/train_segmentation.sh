@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=400G
-#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=slurm_logs/%x_%j.log
 
 # =========================
 # CryoDINO segmentation fine-tuning (segmentation3d.py) on one dataset, then test-set inference
@@ -32,6 +32,7 @@
 # (<dataset>_<p>percent_100_datalist.json).
 # =========================
 set -euo pipefail
+: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 : "${PRESET:?set PRESET (h100_9374 | b200_112 | b200_128 | b200_best | b200_best_full | random_init)}"
 : "${DATASET:?set DATASET (001 | 010 | 989 | 049)}"
 : "${PERCENT:=100}"
@@ -40,7 +41,7 @@ set -euo pipefail
 : "${DEEP_SUPERVISION:=0}"  # 1: add --deep-supervision (the all-dataset b200_112 loop used it; the per-dataset runs did not)
 
 REPO="${REPO:-/cluster/home/$USER/scripts/cryoet/CryoDINO}"
-EXP="${EXP:-/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments}"
+EXP="${EXP:-${CRYOET_ROOT}/experiments}"
 BASE_DATA_DIR="$EXP"
 BASE_OUTPUT_DIR="$EXP/finetuning"
 CACHE_DIR_BASE="$EXP/cache_dir_downstream"

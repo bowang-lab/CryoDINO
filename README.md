@@ -55,7 +55,8 @@ This codebase contains the PyTorch code for pretraining CryoDINO, a 3D ViT-Large
    - [Inference-only baselines (MemBrain-seg / DeePiCt)](#inference-only-baselines-membrain-seg--deepict)
 8. [Visualization](#visualization)
 9. [License](#license)
-10. [Citation](#citation)
+10. [Contact](#contact)
+11. [Citation](#citation)
 
 ---
 
@@ -105,7 +106,7 @@ segmentation3d_inference.py       → particle coordinates; test F4 at
 **Option A — conda (recommended, exact environment)**
 
 ```bash
-git clone https://github.com/<your-org>/CryoDINO.git
+git clone https://github.com/bowang-lab/CryoDINO.git
 cd CryoDINO
 
 # The prefix line in environment.yml is cluster-specific — conda will ignore it
@@ -133,6 +134,15 @@ pip install -r requirements_cryodino.txt
 > **Note:** `requirements.txt` and `environment.yml` reflect the environment used for the H100/A100 experiments (`torch==2.1.0+cu121`, `xformers==0.0.22.post4`, `monai==1.3.0`); `environment_cryodino.yml` and `requirements_cryodino.txt` reflect the B200 environment. Using different versions may require adjustments.
 
 > **GPU memory:** Pretraining was run on 4× B200 (183 GB each); the earlier runs used 4× H100-80GB. Fine-tuning and inference run on a single GPU (200 GB RAM recommended).
+
+**Running the SLURM scripts.** The scripts in `slurm_scripts/` and `baselines/` read the data location from one environment variable, `CRYOET_ROOT`: the folder that holds `datasets/` and `experiments/`. Set it once, and submit from the repository root so logs land in `slurm_logs/`:
+
+```bash
+export CRYOET_ROOT=/path/to/cryoet
+sbatch slurm_scripts/<script>.sh
+```
+
+The remaining placeholders are `<USERNAME>` (shared environments and result folders) and `<YOUR_EMAIL>` (job notifications: remove one `#` from the `##SBATCH --mail-*` lines to turn them on). The two YAML configs in `3DINO/dinov2/configs/` use `<CRYOET_ROOT>` for their default paths.
 
 ---
 
@@ -452,7 +462,7 @@ OMP_NUM_THREADS=1 PYTHONPATH=. python ../baselines/unet_unetr/train.py \
 
 **CryoDINO random init** uses the same fine-tuning pipeline as CryoDINO with no pre-trained weights (`--pretrained-weights ""`) and a trainable backbone: `slurm_scripts/train_segmentation.sh` with `PRESET=random_init`.
 
-**DeePiCt** and **MemBrain-seg** are trained with their own kits, `baselines/deepict/` and `baselines/membrain_kit/` (see their READMEs; `run_datalist.sh` drives the full pipeline from a datalist, and `baselines/submit_deepict.sbatch` / `submit_membrain.sbatch` run one dataset per job: `sbatch --export=ALL,DATASET=001,PERCENT=100 baselines/submit_deepict.sbatch`). MemBrain-seg is binary, so it is only evaluated on the membrane class.
+**DeePiCt** and **MemBrain-seg** are trained with their own kits, `baselines/deepict/` and `baselines/membrain_kit/` (see their READMEs; `run_datalist.sh` drives the full pipeline from a datalist, and `baselines/submit_deepict_*.sbatch` / `submit_membrain_*.sbatch` are the per-dataset SLURM jobs). MemBrain-seg is binary, so it is only evaluated on the membrane class.
 
 ### Detection baselines
 
@@ -616,6 +626,12 @@ This project is licensed under the **Creative Commons Attribution-NonCommercial-
 - You may **not** distribute modified versions or use it commercially.
 
 See [LICENSE](LICENSE) for the full terms.
+
+---
+
+## Contact
+
+For questions about the code, the pretrained weights, or permissions, exceptions and licensing, contact the corresponding authors: Ahmadreza Attarpour (**<EMAIL>**), Sumin Kim (**<EMAIL>**) or Bo Wang (**<EMAIL>**).
 
 ---
 

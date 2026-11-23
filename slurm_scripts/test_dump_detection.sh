@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=36G
-#SBATCH --output=/cluster/home/%u/projects/logs/%x_%j.log
+#SBATCH --output=slurm_logs/%x_%j.log
 
 # Re-run the test set of a finished detection run with its best_model.pth and save per-tomogram
 # predictions (<run>/test_eval/test_predictions.pkl) for bootstrap CIs. Training outputs untouched.
@@ -17,6 +17,7 @@
 #   PERCENT   100 | 50 | 10   (CZII)
 #   PRETRAINED=b200|none, DECODER_FUSION (default adapter), LORA_RANK (default 0)
 set -u
+: "${CRYOET_ROOT:?set CRYOET_ROOT to the CryoDINO data folder (holding datasets/ and experiments/), e.g. export CRYOET_ROOT=/path/to/cryoet}"
 : "${RUN_NAME:?}" "${HEAD:?}" "${PERCENT:?}"
 PRETRAINED="${PRETRAINED:-none}"; DECODER_FUSION="${DECODER_FUSION:-adapter}"; LORA_RANK="${LORA_RANK:-0}"
 
@@ -28,8 +29,8 @@ set -u
 echo "Python env: $(python -c 'import sys, torch; print(sys.prefix, "torch", torch.__version__)')"
 cd /cluster/home/$USER/projects/CryoDINO/3DINO || exit 1
 
-DETECTION_ROOT="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
-EXPERIMENTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+DETECTION_ROOT="${CRYOET_ROOT}/datasets/downstream_detection"
+EXPERIMENTS="${CRYOET_ROOT}/experiments"
 RUN_DIR="${EXPERIMENTS}/finetuning_detection/${RUN_NAME}"
 PATCH_DIR="${DETECTION_ROOT}/Dataset440_CZII_10440_detection_patches_128"
 case "$PERCENT" in 100) BASE_DATA_DIR="$PATCH_DIR" ;; 50|10) BASE_DATA_DIR="${PATCH_DIR}/czi_${PERCENT}percent" ;; *) exit 1 ;; esac
