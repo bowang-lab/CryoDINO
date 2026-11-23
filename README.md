@@ -19,7 +19,7 @@ Bo Wang<sup>†</sup>
 
 <sup>*</sup> Equal contribution &nbsp; <sup>†</sup> Corresponding authors
 
-[Project Page](https://cryodino.github.io/) | [Preprint](https://arxiv.org/abs/XXXX.XXXXX)
+[Project Page](https://cryodino.github.io/) | [Preprint](https://arxiv.org/abs/XXXX.XXXXX) | [HF Weights](https://huggingface.co/XXXX/CryoDINO)
 
 This codebase contains the PyTorch code for pretraining CryoDINO, a 3D ViT-Large trained with the [3DINO](https://github.com/AICONSlab/3DINO) self-supervised framework on cryo-ET tomograms, and for transferring it to 3D segmentation and particle detection.
 
