@@ -1,6 +1,29 @@
-# CryoDINO
+# CryoDINO: A generalizable 3D foundation model for cryo-electron tomography
 
-**CryoDINO** is a 3D self-supervised learning (SSL) foundation model for Cryo-Electron Tomography (CryoET). It adapts the [3DINO](https://www.nature.com/articles/s41746-025-01455-6) framework — a 3D extension of DINOv2 — to learn general-purpose volumetric representations from unlabeled biological tomograms. The pretrained backbone transfers to downstream 3D segmentation and particle detection with strong data efficiency.
+<img src="assets/cryodino_logo.png" alt="CryoDINO logo" width="200px"/>
+
+Ahmadreza Attarpour<sup>*†</sup>,
+Sumin Kim<sup>*†</sup>,
+Tony Xu,
+Charles Chen,
+Daphne Baron,
+Ching-Yuan Yu,
+Yeonwoo Seo,
+Baidu Li,
+Elnaz Khalili Samani,
+Mohammad T. Mazhab-Jafari,
+Maged Goubran,
+Barry B. Rubin,
+Jun Ma,
+Bo Wang<sup>†</sup>
+
+<sup>*</sup> Equal contribution &nbsp; <sup>†</sup> Corresponding authors
+
+[Project Page](https://cryodino.github.io/) | [Preprint](https://arxiv.org/abs/XXXX.XXXXX)
+
+This codebase contains the PyTorch code for pretraining CryoDINO, a 3D ViT-Large trained with the [3DINO](https://github.com/AICONSlab/3DINO) self-supervised framework on cryo-ET tomograms, and for transferring it to 3D segmentation and particle detection.
+
+**Abstract:** Nanometre-resolution images acquired with cryogenic electron tomography (cryo-ET) provide unprecedented insights into sub-cellular architecture and the 3D spatial organization of macromolecules in their native environment. Yet, there remains an unmet need for computational pipelines that generalize across experimental conditions and downstream tasks while remaining robust to extremely low signal-to-noise ratios and reconstruction artifacts. We present CryoDINO, a general-purpose foundation model for cryo-ET, pretrained using teacher-student self-distillation self-supervised learning on a corpus of 1,658 tomograms and 425,852 3D patches spanning 37 species and experimental conditions. CryoDINO learns transferable 3D representations that encode explicit semantic information about macromolecular identity and spatial organization. A shared pretrained backbone, coupled with task-specific decoders, enables both semantic segmentation and particle detection. Validation against state-of-the-art task-specific methods on multiple semantic-segmentation and particle-detection benchmarks demonstrated CryoDINO’s high generalizability and performance. CryoDINO establishes a scalable and transferable representation backbone for generalizable computational pipelines in structural biology.
 
 <p align="center">
   <img src="assets/CryoDINO_figures.png" width="100%"/>
