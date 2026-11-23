@@ -429,7 +429,7 @@ OMP_NUM_THREADS=1 PYTHONPATH=. python ../baselines/unet_unetr/train.py \
 
 **CryoDINO random init** uses the same fine-tuning pipeline as CryoDINO with no pre-trained weights (`--pretrained-weights ""`) and a trainable backbone: `slurm_scripts/train_segmentation.sh` with `PRESET=random_init`.
 
-**DeePiCt** and **MemBrain-seg** are trained with their own kits, `baselines/deepict/` and `baselines/membrain_kit/` (see their READMEs; `run_datalist.sh` drives the full pipeline from a datalist, and `baselines/submit_deepict_*.sbatch` / `submit_membrain_*.sbatch` are the per-dataset SLURM jobs). MemBrain-seg is binary, so it is only evaluated on the membrane class.
+**DeePiCt** and **MemBrain-seg** are trained with their own kits, `baselines/deepict/` and `baselines/membrain_kit/` (see their READMEs; `run_datalist.sh` drives the full pipeline from a datalist, and `baselines/submit_deepict.sbatch` / `submit_membrain.sbatch` run one dataset per job: `sbatch --export=ALL,DATASET=001,PERCENT=100 baselines/submit_deepict.sbatch`). MemBrain-seg is binary, so it is only evaluated on the membrane class.
 
 ### Detection baselines
 
