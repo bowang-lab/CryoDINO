@@ -2,8 +2,8 @@
 
 <img src="assets/cryodino_logo.png" alt="CryoDINO logo" width="200px"/>
 
-Ahmadreza Attarpour<sup>*†</sup>,
-Sumin Kim<sup>*†</sup>,
+Ahmadreza Attarpour<sup>\*†</sup>,
+Sumin Kim<sup>\*†</sup>,
 Tony Xu,
 Charles Chen,
 Daphne Baron,
@@ -17,7 +17,7 @@ Barry B. Rubin,
 Jun Ma,
 Bo Wang<sup>†</sup>
 
-<sup>*</sup> Equal contribution &nbsp; <sup>†</sup> Corresponding authors
+<sup>\*</sup> Equal contribution &nbsp; <sup>†</sup> Corresponding authors
 
 [Project Page](https://cryodino.github.io/) | [Preprint](https://arxiv.org/abs/XXXX.XXXXX) | [HF Weights](https://huggingface.co/XXXX/CryoDINO)
 
