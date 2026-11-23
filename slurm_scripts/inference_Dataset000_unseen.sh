@@ -1,16 +1,16 @@
 #!/bin/bash
 #SBATCH -J 3dino-inference-ds000-unseen
-#SBATCH -p gpu_bwanggroup
+#SBATCH -p gpu_pmccaiteam
 #SBATCH -t 1-12:00:00
-#SBATCH --account=bwanggroup_gpu
+#SBATCH --account=pmccaiteam_gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=20
 #SBATCH --mem=220G
-#SBATCH --mail-user=attarpour1993@gmail.com
+#SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/t139212uhn/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Inference: Dataset000_CZII_10000 (unseen, evaluated with Dataset001 models)
@@ -23,13 +23,13 @@ date; hostname; pwd; nvidia-smi
 
 source ~/.bashrc
 conda activate cryoet
-cd /cluster/home/t139212uhn/scripts/cryoet/CryoET || exit 1
+cd /cluster/home/$USER/scripts/cryoet/CryoET || exit 1
 
 CONFIG_FILE="3DINO/dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
-FINETUNING_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/finetuning"
-INPUT_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream/Dataset000_CZII_10000/imagesTr"
-LABEL_DIR="/cluster/projects/bwanggroup/reza/projects/cryoet/datasets/downstream/Dataset000_CZII_10000/labelsTr"
+PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+FINETUNING_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/finetuning"
+INPUT_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream/Dataset000_CZII_10000/imagesTr"
+LABEL_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream/Dataset000_CZII_10000/labelsTr"
 DATASET_NAME="Dataset001_CZII_10001"   # same class scheme as Dataset001 (4-class)
 NUM_CLASSES=4
 IMAGE_SIZE=112

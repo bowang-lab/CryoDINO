@@ -9,8 +9,19 @@ import logging
 import math
 import os
 from functools import partial
-from monai.transforms import Compose, LoadImaged, ScaleIntensityRangePercentilesd, Lambdad, OneOf, ScaleIntensityd
 import random
+
+# PyTorch 2.6+ changed torch.load default to weights_only=True, which breaks
+# MONAI's PersistentDataset/CacheNTransDataset since cached files contain Python
+# objects (dicts, metadata) beyond plain tensors. Patch before MONAI is imported.
+import torch as _torch
+_orig_torch_load = _torch.load
+def _patched_torch_load(*args, **kwargs):
+    kwargs.setdefault('weights_only', False)
+    return _orig_torch_load(*args, **kwargs)
+_torch.load = _patched_torch_load
+
+from monai.transforms import Compose, LoadImaged, ScaleIntensityRangePercentilesd, Lambdad, OneOf, ScaleIntensityd, MapTransform
 
 from fvcore.common.checkpoint import PeriodicCheckpointer
 import torch
@@ -194,6 +205,38 @@ def do_train(cfg, model, resume=False):
     #         return image_dict
     ## AA CHANGE END
 
+    class KStdNormd(MapTransform):
+        """Normalize (img - tomo_mean) / (k * tomo_std), clip to [-1, 1].
+        k is randomly sampled each call — acts as intensity augmentation.
+        Requires 'tomo_mean' and 'tomo_std' keys in the sample dict (from pretrain.json).
+        """
+        def __init__(self, keys, k_choices=(1, 2, 3, 4, 5)):
+            super().__init__(keys)
+            self.k_choices = k_choices
+
+        def __call__(self, data):
+            d = dict(data)
+            k = random.choice(self.k_choices)
+            mean = float(d['tomo_mean'])
+            std = float(d['tomo_std'])
+            for key in self.key_iterator(d):
+                d[key] = torch.clamp((d[key] - mean) / (k * std + 1e-8), -1.0, 1.0)
+            return d
+
+    class PercentileNormd(MapTransform):
+        """Randomly picks percentile bounds each call, clips to [-1, 1]."""
+        _BOUNDS = [(2.0, 98.0), (1.0, 99.0), (0.5, 99.5), (0.05, 99.95), (0.02, 99.98)]
+
+        def __init__(self, keys):
+            super().__init__(keys)
+            self._transforms = [
+                ScaleIntensityRangePercentilesd(keys=keys, lower=lo, upper=hi, b_min=-1, b_max=1, clip=True)
+                for lo, hi in self._BOUNDS
+            ]
+
+        def __call__(self, data):
+            return random.choice(self._transforms)(data)
+
     # Compose the loading and intensity scaling here to cache transforms in monai persistent dataset
     data_transform = Compose(
             [   
@@ -212,12 +255,8 @@ def do_train(cfg, model, resume=False):
                 # ScaleIntensityRangePercentilesd(keys=["image"], lower=0.05, upper=99.95, b_min=-1, b_max=1, clip=True),
                 OneOf(
                         [
-                            # ScaleIntensityRangePercentilesd(keys=["image"], lower=5.00, upper=95.00, b_min=-1, b_max=1, clip=True),
-                            ScaleIntensityRangePercentilesd(keys=["image"], lower=2.00, upper=98.00, b_min=-1, b_max=1, clip=True),
-                            ScaleIntensityRangePercentilesd(keys=["image"], lower=1.00, upper=99.00, b_min=-1, b_max=1, clip=True),
-                            ScaleIntensityRangePercentilesd(keys=["image"], lower=0.5, upper=99.50, b_min=-1, b_max=1, clip=True),
-                            ScaleIntensityRangePercentilesd(keys=["image"], lower=0.05, upper=99.95, b_min=-1, b_max=1, clip=True),
-                            ScaleIntensityRangePercentilesd(keys=["image"], lower=0.02, upper=99.98, b_min=-1, b_max=1, clip=True)
+                            KStdNormd(keys=["image"], k_choices=(1, 2, 3, 4, 5)),
+                            PercentileNormd(keys=["image"]),
                         ]
                     ),
                 # AA CHANGE END

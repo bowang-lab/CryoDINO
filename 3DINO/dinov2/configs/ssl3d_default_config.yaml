@@ -59,9 +59,9 @@ ibot:
   head_nlayers: 3
   head_hidden_dim: 2048
 train:
-  batch_size_per_gpu: 143
+  batch_size_per_gpu: 275
   data_min_axis_size: 24
-  dataset_path: '/cluster/projects/bwanggroup/reza/projects/cryoet/experiments/pretrain.json'
+  dataset_path: '/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/pretrain.json'
   output_dir: ./output_test
   saveckp_freq: 20
   seed: 0

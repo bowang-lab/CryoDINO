@@ -100,8 +100,8 @@ def get_metric(dataset_name):
         if "10989" in dataset_name or "10010" in dataset_name:
             return LASEGMetrics()
         elif "12049" in dataset_name:
-            # return CryoMetrics4()  # classes 1 and 5 merged into bg → 4 effective classes
-            return CryoMetrics6()  # original 6-class labels (remap disabled)
+            return CryoMetrics4()  # classes 1 and 5 merged into bg → 4 effective classes
+            # return CryoMetrics6()  # original 6-class labels (remap disabled)
         # 4-class segmentation for CZII 10001
         else:
             return CryoMetrics4()

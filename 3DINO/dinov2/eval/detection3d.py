@@ -1,0 +1,922 @@
+# Author: Tony Xu
+#
+# This code is licensed under the CC BY-NC-ND 4.0 license
+# found in the LICENSE file in the root directory of this source tree.
+
+# Edited by AA to add 3D detection functionality. Original file is for 3D segmentation.
+
+from dinov2.data.loaders import make_detection_dataset_3d
+from dinov2.data import SamplerType, make_data_loader
+from dinov2.eval.detection_3d.detection_heads import UNETRHead, LinearDecoderHead, ViTAdapterUNETRHead, ResNetFPNHead
+from dinov2.eval.detection_3d.detection_heads import build_vit_detection_head, DECODER_FUSIONS, DEFAULT_ENCODER_LAYERS
+from dinov2.eval.setup import get_args_parser, setup_and_build_model_3d, get_autocast_dtype
+from dinov2.utils.config import setup_3d
+from dinov2.eval.detection_3d.augmentations import make_transforms
+from dinov2.eval.detection_3d.metrics import get_metric
+from dinov2.eval.detection_3d.loss import object_detection_loss, decode_detections_with_nms
+
+import gc
+import heapq
+import os
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+import json
+import math
+from functools import partial
+# AA: from monai.inferers import sliding_window_inference  # replaced by sliding_window_accumulate
+from monai.optimizers import WarmupCosineSchedule
+
+
+def detection_collate_fn(batch):
+    images = torch.stack([d["image"] for d in batch])        # [B, 1, D, H, W]
+    N_max  = max(d["points"].shape[0] for d in batch)
+    labels = torch.full((len(batch), N_max, 5), -100.0)
+    for i, d in enumerate(batch):
+        pts = torch.as_tensor(d["points"], dtype=torch.float32)
+        labels[i, :pts.shape[0]] = pts
+    result = {"image": images, "points": labels}             # labels: [B, N_max, 5]  cols=(x,y,z,class_id,sigma); padding=-100
+    # AA: pass voxel_size through for val/test metric computation
+    if "voxel_size" in batch[0]:
+        result["voxel_size"] = torch.tensor([d["voxel_size"] for d in batch], dtype=torch.float32)
+    return result
+
+class DeepSupervisionWrapper(nn.Module):
+    def __init__(self, loss, weight_factors=None):
+        super().__init__()
+        assert weight_factors is None or any(x != 0 for x in weight_factors), \
+            "At least one weight factor should be != 0.0"
+        self.weight_factors = tuple(weight_factors) if weight_factors is not None else None
+        self.loss = loss
+
+    def forward(self, *args):
+        assert all(isinstance(i, (tuple, list)) for i in args), \
+            f"all args must be tuple or list, got {[type(i) for i in args]}"
+        weights = self.weight_factors if self.weight_factors is not None else (1,) * len(args[0])
+        return sum(weights[i] * self.loss(*inputs)
+                   for i, inputs in enumerate(zip(*args)) if weights[i] != 0.0)
+
+
+def clear_cuda_memory():
+    try:
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+    except Exception as e:
+        print(f"Failed to clear CUDA memory: {e}")
+
+
+# ---------------------------------------------------------------------------------------------
+# Opt-in LoRA on the frozen pretrained ViT (--lora-rank > 0). Off by default.
+# ---------------------------------------------------------------------------------------------
+LORA_TARGETS = ('qkv', 'proj', 'fc1', 'fc2')     # attn.qkv, attn.proj, mlp.fc1, mlp.fc2 of every block
+
+
+class LoRALinear(nn.Module):
+    """A frozen nn.Linear plus a trainable low-rank update:
+        y = x W^T + b + (alpha / rank) * (x A^T) B^T,   A: rank x in, B: out x rank.
+    The wrapped layer's own weight/bias Parameters are re-registered under the same names, so the
+    base state_dict keys (...attn.qkv.weight / .bias) are unchanged and lora_A / lora_B are added
+    beside them. B starts at zero, so at init the output equals the wrapped layer's exactly.
+    A plain module call (F.linear), so it runs under autocast and inside xFormers MemEffAttention."""
+
+    def __init__(self, base, rank, alpha):
+        super().__init__()
+        self.in_features, self.out_features = base.in_features, base.out_features
+        self.weight = base.weight
+        self.register_parameter('bias', base.bias)
+        self.rank = rank
+        self.scaling = alpha / rank
+        kw = dict(device=base.weight.device, dtype=base.weight.dtype)
+        self.lora_A = nn.Parameter(torch.empty(rank, self.in_features, **kw))
+        self.lora_B = nn.Parameter(torch.zeros(self.out_features, rank, **kw))
+        nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))     # as nn.Linear / peft
+
+    def forward(self, x):
+        return F.linear(x, self.weight, self.bias) + F.linear(F.linear(x, self.lora_A), self.lora_B) * self.scaling
+
+    def extra_repr(self):
+        return f"in_features={self.in_features}, out_features={self.out_features}, rank={self.rank}, scaling={self.scaling:g}"
+
+
+def vit_blocks(vit):
+    """The ViT's transformer blocks in order; chunked blocks (BlockChunk padded with nn.Identity)
+    are flattened to the real blocks."""
+    return [b for chunk in vit.blocks for b in chunk if not isinstance(b, nn.Identity)] \
+        if vit.chunked_blocks else list(vit.blocks)
+
+
+def parse_lora_targets(spec):
+    targets = [t.strip() for t in spec.split(',') if t.strip()]
+    bad = [t for t in targets if t not in LORA_TARGETS]
+    if not targets or bad or len(set(targets)) != len(targets):
+        raise ValueError(f"--lora-targets must be a comma list of distinct names from {LORA_TARGETS}, got {spec!r}")
+    return targets
+
+
+def apply_lora(vit, rank, alpha, targets):
+    """Wrap the targeted Linear layers of every ViT block in LoRALinear; returns the LoRA params."""
+    lora_params = []
+    for i, block in enumerate(vit_blocks(vit)):
+        for name in targets:
+            parent = block.attn if name in ('qkv', 'proj') else block.mlp
+            layer = getattr(parent, name, None)
+            if type(layer) is not nn.Linear:
+                raise ValueError(f"LoRA target {name!r} of block {i} is {type(layer).__name__}, not nn.Linear")
+            lora = LoRALinear(layer, rank, alpha)
+            setattr(parent, name, lora)
+            lora_params += [lora.lora_A, lora.lora_B]
+    return lora_params
+
+
+def add_seg_args(parser):
+    parser.add_argument(
+        "--dataset-name",
+        type=str,
+        help="Name of finetuning dataset",
+    )
+    parser.add_argument(
+        "--dataset-percent",
+        type=int,
+        help="Percent of finetuning dataset to use",
+        default=100
+    )
+    parser.add_argument(
+        "--base-data-dir",
+        type=str,
+        help="Base data directory for finetuning dataset",
+    )
+    parser.add_argument(
+        "--segmentation-head",
+        type=str,
+        help="Segmentation head",
+    )
+    parser.add_argument(
+        "--train-feature-model",
+        action="store_true",
+        help="Freeze feature model or not",
+    )
+    parser.add_argument(
+        "--train-last-n-blocks",
+        type=int,
+        default=0,
+        help="With a frozen backbone, unfreeze only its last N transformer blocks (0 = fully frozen)",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        help="Total epochs",
+    )
+    parser.add_argument(
+        "--epoch-length",
+        type=int,
+        help="Iterations to perform per epoch",
+    )
+    parser.add_argument(
+        "--eval-iters",
+        type=int,
+        help="Iterations to perform per evaluation",
+    )
+    parser.add_argument(
+        "--warmup-iters",
+        type=int,
+        help="Warmup iterations",
+    )
+    parser.add_argument(
+        "--image-size",
+        type=int,
+        help="Image side length",
+    )
+    parser.add_argument(
+        "--resize-scale",
+        type=float,
+        help="Scale factor for resizing images",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        help="Batch size",
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        help="Number of workers for data loading",
+    )
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        help="Learning rate",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        type=str,
+        help="path to cache directory for monai persistent dataset"
+    )
+    parser.add_argument(
+        "--deep-supervision",
+        action="store_true",
+        help="Enable deep supervision with auxiliary decoder outputs (UNETR and ViTAdapterUNETR only)",
+    )
+    parser.add_argument(
+        "--decoder-fusion",
+        type=str,
+        choices=DECODER_FUSIONS,
+        default="adapter",
+        help="ViT decoder for --segmentation-head ViTAdapterUNETR. adapter (default): original "
+             "ViT-Adapter + UNETR decoder. fpn: plain ViT, 4 blocks -> strides 2/4/8/16 -> FPN (as the "
+             "ResNet34-FPN baseline). concat: plain ViT, blocks concatenated -> simple pyramid -> FPN. "
+             "adapter_multi: original adapter head + extra block taps (--encoder-layers) added per stage "
+             "through zero-init 1x1 convs. adapter_fpn: original adapter head + zero-init FPN-style "
+             "top-down residual over the UNETR skips. Both adapter_* start identical to adapter",
+    )
+    parser.add_argument(
+        "--encoder-layers",
+        type=str,
+        default=None,
+        help="Comma list of ViT block indices (0-based, negatives count from the end) for "
+             f"--decoder-fusion concat|fpn|adapter_multi; use the = form for negatives (--encoder-layers=-2,-1). "
+             f"Defaults: {DEFAULT_ENCODER_LAYERS}",
+    )
+    parser.add_argument(
+        "--clip-grad",
+        type=float,
+        default=None,
+        help="Clip the total grad norm of the trained parameters to this value (after unscaling the "
+             "GradScaler). Default None / 0: no clipping",
+    )
+    parser.add_argument(
+        "--lora-rank",
+        type=int,
+        default=0,
+        help="LoRA rank on the frozen pretrained ViT (--segmentation-head ViTAdapterUNETR, frozen "
+             "encoder only). 0 (default): no LoRA",
+    )
+    parser.add_argument(
+        "--lora-alpha",
+        type=float,
+        default=None,
+        help="LoRA alpha; the update is scaled by alpha/rank. Default: alpha = rank (scale 1)",
+    )
+    parser.add_argument(
+        "--lora-targets",
+        type=str,
+        default="qkv,proj",
+        help=f"Comma list of the Linear layers in every ViT block to adapt, from {','.join(LORA_TARGETS)} "
+             "(default qkv,proj)",
+    )
+    parser.add_argument(
+        "--lora-lr",
+        type=float,
+        default=None,
+        help="Learning rate of the LoRA parameters (own AdamW param group, same warmup-cosine "
+             "schedule). Default: --learning-rate",
+    )
+    parser.add_argument(
+        "--save-test-predictions",
+        action="store_true",
+        help="Also write test_predictions.pkl / .csv (all decoded test detections + GT per tomogram) "
+             "next to results.json. Off by default.",
+    )
+
+    return parser
+
+
+# AA: old segmentation train_iter:
+# def train_iter(model, batch, optimizer, scheduler, loss_function, scaler, deep_supervision=False):
+#     x, y = (batch["image"].cuda(), batch["label"].cuda())
+#     outputs = model(x)
+#
+#     if deep_supervision and isinstance(outputs, (list, tuple)):
+#         # Downsample labels to match each auxiliary output resolution
+#         labels = [F.interpolate(y.float(), size=out.shape[2:], mode='nearest') for out in outputs]
+#         loss = loss_function(list(outputs), labels)
+#     else:
+#         loss = loss_function(outputs, y)
+#
+#     optimizer.zero_grad()
+#     scaler.scale(loss).backward()
+#     scaler.step(optimizer)
+#     scaler.update()
+#     scheduler.step()
+#     return loss.item()
+
+# AA: old train_iter with hardcoded strides:
+# def train_iter(model, batch, optimizer, scheduler, scaler, strides=2):
+#     x      = batch["image"].cuda()
+#     labels = batch["points"].cuda()
+#     cls_map, off_map = model(x)
+#     loss, loss_dict = object_detection_loss(cls_map, off_map, strides=strides, labels=labels)
+#     optimizer.zero_grad()
+#     scaler.scale(loss).backward()
+#     scaler.step(optimizer)
+#     scaler.update()
+#     scheduler.step()
+#     return loss.item(), loss_dict
+
+def train_iter(model, batch, optimizer, scheduler, scaler, loss_fn, clip_grad=None):
+    x      = batch["image"].cuda()
+    labels = batch["points"].cuda()
+    cls_map, off_map = model(x)
+    loss, loss_dict = loss_fn(cls_map, off_map, labels=labels)
+    optimizer.zero_grad()
+    scaler.scale(loss).backward()
+    if clip_grad:
+        # unscale once here; scaler.step() then skips its own unscale (and still skips the step on inf/nan)
+        scaler.unscale_(optimizer)
+        grad_norm = float(torch.nn.utils.clip_grad_norm_(
+            [p for group in optimizer.param_groups for p in group['params']], clip_grad))
+        if math.isfinite(grad_norm):                    # fp16 overflow steps are skipped by the scaler
+            loss_dict = {**loss_dict, 'grad_norm': grad_norm, 'grad_n': 1.0,
+                         'grad_clipped': float(grad_norm > clip_grad)}
+    scaler.step(optimizer)
+    scaler.update()
+    scheduler.step()
+    return loss.item(), loss_dict
+
+
+# AA: old make_patchwise_predictor (for monai sliding_window_inference, segmentation):
+# def make_patchwise_predictor(model):
+#     from monai.transforms import ScaleIntensityRangePercentiles
+#     normalize = ScaleIntensityRangePercentiles(
+#         lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False
+#     )
+#     def predictor(patch_data):
+#         normalized = torch.stack([normalize(patch_data[i]) for i in range(patch_data.shape[0])])
+#         return model(normalized)
+#     return predictor
+
+@torch.no_grad()
+def sliding_window_accumulate(model, volume, patch_size, stride=2, overlap=0.5):
+    """Tile full volume, run model on each tile, accumulate class probas and off_map.
+
+    Ported from Kaggle AccumulatedObjectDetectionPredictionContainer (od_accumulator.py).
+    Raw logits are accumulated and averaged across overlapping tiles — matching Kaggle's
+    od_accumulator.py. Sigmoid is applied once at decode time in decode_detections_with_nms.
+
+    Per-patch percentile normalization is applied inside the loop, matching the
+    normalization used during training (ScaleIntensityRangePercentiles 0.5-99.5 → [-1,1]).
+
+    Args:
+        model      : detection model, forward(x) → (cls_logits [1,C,D/s,H/s,W/s], off_map [1,3,...])
+        volume     : [1, 1, D, H, W] float tensor (z-score normalized)
+        patch_size : int, tile side length in voxels (must be divisible by stride)
+        stride     : model output stride (default 2)
+        overlap    : fraction of overlap between adjacent tiles (default 0.5)
+
+    Returns:
+        scores_acc  : [C, Ds, Hs, Ws] averaged logits (not yet sigmoid)
+        offsets_acc : [3, Ds, Hs, Ws] averaged offset predictions
+    """
+    from monai.transforms import ScaleIntensityRangePercentiles
+    normalize = ScaleIntensityRangePercentiles(lower=0.5, upper=99.5, b_min=-1, b_max=1, clip=True, relative=False)
+
+    _, _, D, H, W = volume.shape
+    Ds, Hs, Ws    = D // stride, H // stride, W // stride
+    device        = volume.device
+    step          = max(1, int(patch_size * (1 - overlap)))
+
+    def tile_positions(dim, ps):
+        """Start positions for overlapping tiles along one dimension."""
+        if dim <= ps:
+            return [0]
+        stops = list(range(0, dim - ps + 1, step))
+        if stops[-1] + ps < dim:
+            stops.append(dim - ps)
+        return stops
+
+    # volume is [B, C, X, Y, Z] (nibabel XYZ axis order, matching pretraining)
+    # D = X dim (axis 2), H = Y dim (axis 3), W = Z dim (axis 4, thin ~60 vox)
+    x_starts = tile_positions(D, patch_size)   # D = X dimension
+    y_starts = tile_positions(H, patch_size)   # H = Y dimension
+    z_starts = tile_positions(W, patch_size)   # W = Z dimension (thin)
+
+    scores_acc  = None
+    offsets_acc = None
+    counter     = None
+
+    for x0 in x_starts:
+        for y0 in y_starts:
+            for z0 in z_starts:
+                x1, y1, z1 = min(x0 + patch_size, D), min(y0 + patch_size, H), min(z0 + patch_size, W)
+                patch   = volume[:, :, x0:x1, y0:y1, z0:z1]                    # [1, 1, px, py, pz]
+                patch_n = torch.stack([normalize(patch[i]) for i in range(patch.shape[0])])
+
+                with torch.cuda.amp.autocast():
+                    cls_logits, off = model(patch_n)                            # [1, C, px/s, py/s, pz/s]
+                # AA: old per-tile sigmoid (mean(sigmoid(x)) ≠ sigmoid(mean(x))):
+                # cls_logits = cls_logits[0].float().sigmoid()
+                # accumulate raw logits — matches Kaggle od_accumulator.py; sigmoid applied at decode time
+                cls_logits = cls_logits[0].float()                              # [C, px/s, py/s, pz/s]  logits
+                off        = off[0].float()                                     # [3, px/s, py/s, pz/s]
+
+                if scores_acc is None:
+                    C           = cls_logits.shape[0]
+                    scores_acc  = torch.zeros(C, Ds, Hs, Ws, device=device)
+                    offsets_acc = torch.zeros(3, Ds, Hs, Ws, device=device)
+                    counter     = torch.zeros(   Ds, Hs, Ws, device=device)
+
+                x0s, y0s, z0s = x0 // stride, y0 // stride, z0 // stride
+                x1s = min(x0s + cls_logits.shape[1], Ds)
+                y1s = min(y0s + cls_logits.shape[2], Hs)
+                z1s = min(z0s + cls_logits.shape[3], Ws)
+                cx, cy, cz = x1s - x0s, y1s - y0s, z1s - z0s
+
+                scores_acc[:, x0s:x1s, y0s:y1s, z0s:z1s]  += cls_logits[:, :cx, :cy, :cz]
+                offsets_acc[:, x0s:x1s, y0s:y1s, z0s:z1s] += off[:, :cx, :cy, :cz]
+                counter[x0s:x1s, y0s:y1s, z0s:z1s]        += 1
+
+    zero_mask    = counter.eq(0).unsqueeze(0)
+    scores_acc   = (scores_acc  / counter.unsqueeze(0)).masked_fill(zero_mask, 0.0)
+    offsets_acc  = (offsets_acc / counter.unsqueeze(0)).masked_fill(zero_mask, 0.0)
+    return scores_acc, offsets_acc
+
+
+# AA: old segmentation val_iter:
+# def val_iter(model, batch, metric, image_size, batch_size, overlap=0.5):
+#     x, y = (batch["image"].cuda(), batch["label"].cuda())
+#     logits = sliding_window_inference(x, image_size, batch_size, make_patchwise_predictor(model), overlap=overlap)
+#     # logits = sliding_window_inference(x, image_size, batch_size, model, overlap=overlap)
+#     iter_metric = metric(logits, y)
+#     torch.cuda.empty_cache()
+#     return iter_metric
+
+def detection_val_iter(model, batch, detection_metric, patch_size, stride=2, overlap=0.5, dataset_name='czi'):
+    """Run detection inference on one full tomogram via sliding window; accumulate into detection_metric.
+
+    After iterating the full val set, call detection_metric.threshold_sweep() to find the best
+    confidence threshold and F4/F-beta score, then detection_metric.reset() before the next epoch.
+
+    Uses a low min_score (0.05) so all candidates above noise are retained; threshold_sweep()
+    picks the optimal threshold post-hoc across all val tomograms simultaneously.
+    """
+    x          = batch["image"].cuda()              # [1, 1, D, H, W]
+    gt_points  = batch["points"][0]                 # [N_max, 5] (x,y,z,class_id,sigma)
+    voxel_size = float(batch["voxel_size"][0]) if "voxel_size" in batch else 10.0
+
+    scores, offsets = sliding_window_accumulate(
+        model, x, patch_size=patch_size, stride=stride, overlap=overlap
+    )                                               # [C, Ds, Hs, Ws], [3, Ds, Hs, Ws]
+
+    # NMS radius per class in voxels, derived from metric's particle radii
+    if dataset_name == 'czi':
+        class_sigmas = [r / voxel_size for r in detection_metric.PARTICLE_RADII_ANG]
+    elif dataset_name == 'byu':
+        class_sigmas = [detection_metric.min_radius / voxel_size]
+    else:
+        class_sigmas = [10.0]
+
+    pred_centers, pred_labels, pred_scores = decode_detections_with_nms(
+        scores=[scores],                            # list of [C, Ds, Hs, Ws] — probas (post-sigmoid)
+        offsets=[offsets],                          # list of [3, Ds, Hs, Ws]
+        strides=[stride],
+        min_score=0.05,                             # keep all candidates; threshold_sweep picks best
+        class_sigmas=class_sigmas,
+        iou_threshold=0.8,                          # permissive — matches Kaggle val; nearby particles are real
+        scores_are_logits=True,                     # sliding_window_accumulate returns logits; sigmoid applied here
+    )
+
+    if dataset_name == 'czi':
+        detection_metric.accumulate(pred_centers, pred_labels, pred_scores, gt_points, voxel_size)
+    elif dataset_name == 'byu':
+        detection_metric.accumulate(pred_centers, pred_scores, gt_points, voxel_size)
+
+    torch.cuda.empty_cache()
+
+
+def do_finetune(feature_model, autocast_dtype, args):
+
+    # opt-in LoRA: validate before the (slow) dataset setup
+    if args.lora_rank < 0:
+        raise ValueError(f"--lora-rank must be >= 0, got {args.lora_rank}")
+    if args.lora_rank > 0:
+        if args.segmentation_head != 'ViTAdapterUNETR':
+            raise ValueError("--lora-rank needs --segmentation-head ViTAdapterUNETR (a pretrained ViT)")
+        if args.train_feature_model or args.train_last_n_blocks > 0:
+            raise ValueError("--lora-rank only applies to the frozen encoder; drop --train-feature-model / "
+                             "--train-last-n-blocks")
+        lora_targets = parse_lora_targets(args.lora_targets)
+        lora_alpha = float(args.lora_rank) if args.lora_alpha is None else args.lora_alpha
+    elif args.lora_alpha is not None or args.lora_lr is not None:
+        raise ValueError("--lora-alpha / --lora-lr need --lora-rank > 0")
+
+    # get transforms, dataset, dataloaders
+    # AA: old call with extra args (make_transforms signature will expand later):
+    # train_transforms, val_transforms = make_transforms(
+    #     args.dataset_name, args.image_size, args.resize_scale,
+    #     min_int=-1.0, train_feature_model=args.train_feature_model,
+    # )
+    train_transforms, val_transforms = make_transforms(crop_size=args.image_size)
+    train_ds, val_ds, test_ds, input_channels, num_classes = make_detection_dataset_3d(
+        args.dataset_name,
+        args.dataset_percent,
+        args.base_data_dir,
+        train_transforms,
+        val_transforms,
+        args.cache_dir,
+        args.batch_size
+    )
+    train_loader = make_data_loader(
+        dataset=train_ds,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        shuffle=True,
+        seed=0,
+        sampler_type=SamplerType.SHARDED_INFINITE,
+        drop_last=False,
+        persistent_workers=True,
+        collate_fn=detection_collate_fn
+    )
+    val_loader = make_data_loader(
+        dataset=val_ds,
+        batch_size=1,
+        num_workers=args.num_workers,
+        shuffle=False,
+        seed=0,
+        sampler_type=SamplerType.DISTRIBUTED,
+        drop_last=False,
+        persistent_workers=False,
+        collate_fn=detection_collate_fn
+    )
+    test_loader = make_data_loader(
+        dataset=test_ds,
+        batch_size=1,
+        num_workers=args.num_workers,
+        shuffle=False,
+        seed=0,
+        sampler_type=SamplerType.DISTRIBUTED,
+        drop_last=False,
+        persistent_workers=False,
+        collate_fn=detection_collate_fn
+    )
+
+    # get model
+    autocast_ctx = partial(torch.cuda.amp.autocast, enabled=True, dtype=autocast_dtype)
+    scaler = torch.cuda.amp.GradScaler()
+    if args.segmentation_head == 'UNETR':
+        seg_model = UNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx,
+                              deep_supervision=args.deep_supervision)
+    elif args.segmentation_head == 'Linear':
+        seg_model = LinearDecoderHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
+    elif args.segmentation_head == 'ViTAdapterUNETR':
+        # AA: ViTAdapterUNETRHead has no deep_supervision (removed with decoder1); passing it raised TypeError
+        # --decoder-fusion adapter (default) returns the unchanged ViTAdapterUNETRHead
+        seg_model = build_vit_detection_head(feature_model, input_channels, args.image_size, num_classes,
+                                             autocast_ctx, fusion=args.decoder_fusion,
+                                             encoder_layers=args.encoder_layers)
+        if args.decoder_fusion != 'adapter':
+            print(f"ViT decoder: {args.decoder_fusion}, encoder blocks {seg_model.encoder_layers}", flush=True)
+    elif args.segmentation_head == 'ResNetFPN':
+        # Same-loss CNN baseline: MONAI ResNet34-FPN from scratch + the same detection head
+        seg_model = ResNetFPNHead(input_channels, args.image_size, num_classes, autocast_ctx)
+    else:
+        raise ValueError(f"Unknown segmentation head: {args.segmentation_head}")
+    if args.segmentation_head != 'ViTAdapterUNETR' and (args.decoder_fusion != 'adapter' or args.encoder_layers):
+        raise ValueError("--decoder-fusion/--encoder-layers only apply to --segmentation-head ViTAdapterUNETR")
+
+    # ResNetFPN has no pretrained backbone: every layer trains, so freezing does not apply
+    from_scratch = args.segmentation_head == 'ResNetFPN'
+
+    if from_scratch:
+        pass
+    elif args.train_feature_model:
+        if args.segmentation_head == 'ViTAdapterUNETR':
+            seg_model.feature_model.vit_model.train()
+        else:
+            seg_model.feature_model.train()
+
+    else:
+        if args.segmentation_head == 'ViTAdapterUNETR':
+            seg_model.feature_model.vit_model.eval()
+            for param in seg_model.feature_model.vit_model.parameters():
+                param.requires_grad = False
+            if args.train_last_n_blocks > 0:
+                # blocks may be chunked (BlockChunk padded with nn.Identity): flatten to the real blocks
+                blocks = vit_blocks(seg_model.feature_model.vit_model)
+                for block in blocks[-args.train_last_n_blocks:]:
+                    for param in block.parameters():
+                        param.requires_grad = True
+        else:
+            seg_model.feature_model.eval()
+            for param in seg_model.feature_model.parameters():
+                param.requires_grad = False
+
+    # LoRA goes on after freezing: the ViT base weights stay frozen, only lora_A / lora_B train
+    lora_params = []
+    if args.lora_rank > 0:
+        lora_params = apply_lora(seg_model.feature_model.vit_model, args.lora_rank, lora_alpha, lora_targets)
+        print(f"LoRA: rank {args.lora_rank}, alpha {lora_alpha:g}, targets {','.join(lora_targets)}, "
+              f"{sum(p.numel() for p in lora_params) / 1e6:.3f}M params in {len(lora_params) // 2} layers, "
+              f"lr {args.lora_lr if args.lora_lr is not None else args.learning_rate:g}", flush=True)
+
+    trainable_params = [name for name, param in seg_model.named_parameters() if param.requires_grad]
+    print(f"Trainable parameters: {trainable_params}")
+    n_total = sum(p.numel() for p in seg_model.parameters())
+    n_train = sum(p.numel() for p in seg_model.parameters() if p.requires_grad)
+    print(f"{args.segmentation_head}: {n_total / 1e6:.2f}M params, {n_train / 1e6:.2f}M trainable", flush=True)
+
+    # get optimizer, scheduler, loss function, metric
+    if lora_params and args.lora_lr is not None:
+        # two param groups; WarmupCosineSchedule (LambdaLR) scales each group's own base lr
+        lora_ids = {id(p) for p in lora_params}
+        other_params = [p for p in seg_model.parameters() if p.requires_grad and id(p) not in lora_ids]
+        optimizer = torch.optim.AdamW([{'params': other_params}, {'params': lora_params, 'lr': args.lora_lr}],
+                                      lr=args.learning_rate)
+    else:
+        optimizer = torch.optim.AdamW(filter(lambda x: x.requires_grad, seg_model.parameters()), lr=args.learning_rate)
+    if args.clip_grad:
+        print(f"Gradient clipping: max total norm {args.clip_grad:g}", flush=True)
+    max_iter = args.epochs * args.epoch_length
+    scheduler = WarmupCosineSchedule(
+        optimizer,
+        warmup_steps=args.warmup_iters,
+        t_total=max_iter
+    )
+
+    # AA: old segmentation loss_fn setup (DiceCELoss/DiceLoss, deep supervision wrapper):
+    # if args.dataset_name == 'BTCV' or args.dataset_name == 'LA-SEG' or ...:
+    #     loss_fn = DiceCELoss(to_onehot_y=True, softmax=True)
+    # elif args.dataset_name == 'BraTS':
+    #     loss_fn = DiceLoss(smooth_nr=0, smooth_dr=1e-5, squared_pred=True, to_onehot_y=False, sigmoid=True)
+    # else:
+    #     raise ValueError(f"Unknown dataset name: {args.dataset_name}")
+    # if args.deep_supervision and args.segmentation_head in ('UNETR', 'ViTAdapterUNETR'):
+    #     num_ds_outputs = 4
+    #     weights = np.array([1 / (2 ** i) for i in range(num_ds_outputs)], dtype=np.float32)
+    #     weights = weights / weights.sum()
+    #     weights[-1] = 0.0
+    #     weights = weights.tolist()
+    #     print(f"Deep supervision enabled. Weights: {weights}")
+    #     loss_fn = DeepSupervisionWrapper(loss_fn, weight_factors=weights)
+
+    # Dataset-specific detection config: strides and loss hyperparameters.
+    # partial() pre-fills strides so train_iter calls loss_fn(cls_map, off_map, labels=labels)
+    # without needing to know the dataset. Add dataset-specific assigner params here if needed.
+    if args.dataset_name == 'czi':
+        detection_strides = 2
+        loss_fn = partial(object_detection_loss, strides=detection_strides)
+    elif args.dataset_name == 'byu':
+        detection_strides = 2
+        loss_fn = partial(object_detection_loss, strides=detection_strides)
+    else:
+        raise ValueError(f"Unknown detection dataset: '{args.dataset_name}'")
+
+    # AA: renamed from dice_metric; returns CZIDetectionMetrics or BYUDetectionMetrics
+    detection_metric = get_metric(args.dataset_name)
+
+    seg_model.cuda()
+    # AA: loss_fn.cuda()  # no separate loss_fn for detection; object_detection_loss used directly in train_iter
+
+    # AA: old segmentation training state:
+    # best_val_dice = -1
+    # val_dice_list = []
+    # val_per_cls_dice_list = []
+    best_val_f4    = -1.0
+    best_val_thr   = None        # thresholds of the best-val checkpoint, reused on test
+    top5_heap      = []          # min-heap (f4, iter, ckpt_path) — keeps top-5 checkpoints
+    train_loss_sum = 0
+    train_loss_count = 0
+    window_sum, window_count, window_dict = 0.0, 0, {}
+    iters_list          = []
+    train_loss_list     = []
+    val_f4_list         = []
+    val_per_cls_f4_list = []
+
+    for it, train_data in enumerate(train_loader):
+
+        # train for one iteration
+        # AA: segmentation train_iter call:
+        # train_loss = train_iter(
+        #     model=seg_model,
+        #     batch=train_data,
+        #     optimizer=optimizer,
+        #     scheduler=scheduler,
+        #     loss_function=loss_fn,
+        #     scaler=scaler,
+        #     deep_supervision=args.deep_supervision
+        # )
+        train_loss, train_loss_dict = train_iter(
+            model=seg_model,
+            batch=train_data,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            scaler=scaler,
+            loss_fn=loss_fn,
+            clip_grad=args.clip_grad,
+        )
+        train_loss_sum += train_loss
+        train_loss_count += 1
+
+        # AA: running mean over the print window, not a single iteration. The per-iter loss is
+        # normalized by assigned_scores.sum().clamp_min(1), which differs between batches with and
+        # without particles, so single samples look flat-and-noisy even while training progresses.
+        window_sum += train_loss
+        window_count += 1
+        for _k, _v in train_loss_dict.items():
+            window_dict[_k] = window_dict.get(_k, 0.0) + _v
+
+        if it % 100 == 0:
+            _m = {k: v / window_count for k, v in window_dict.items()}
+            print(f"[Iter {it}] train loss (mean/{window_count}): {window_sum / window_count:.4f}  "
+                  f"cls: {_m.get('cls_loss', 0):.4f}  reg: {_m.get('reg_loss', 0):.5f}  "
+                  f"divisor: {_m.get('num_items_in_batch', 0):.1f}  "
+                  f"lr: {scheduler.get_last_lr()[0]:.3e}"
+                  + (f"  grad norm (pre-clip, mean/{int(window_dict.get('grad_n', 0))}): "
+                     f"{window_dict.get('grad_norm', 0) / max(window_dict.get('grad_n', 0), 1):.3f}  "
+                     f"clipped: {window_dict.get('grad_clipped', 0) / max(window_dict.get('grad_n', 0), 1):.0%}"
+                     if args.clip_grad else ""), flush=True)
+            window_sum, window_count, window_dict = 0.0, 0, {}
+
+        if it > 0 and it % args.eval_iters == 0:
+            # AA: old segmentation val block:
+            # total_val_dice = 0
+            # total_per_cls_val_dice = [0 for _ in range(num_classes)]
+            # val_steps = 0
+            # seg_model.eval()
+            # with torch.no_grad():
+            #     for val_data in val_loader:
+            #         val_dice, val_per_cls_dice = val_iter(
+            #             model=seg_model, batch=val_data,
+            #             image_size=(args.image_size,) * 3, batch_size=args.batch_size,
+            #             metric=dice_metric, overlap=0.
+            #         )
+            #         total_val_dice += val_dice
+            #         for i in range(num_classes):
+            #             total_per_cls_val_dice[i] += val_per_cls_dice[i]
+            #         val_steps += 1
+            #         clear_cuda_memory()
+            # avg_val_dice = total_val_dice / val_steps
+            # avg_per_cls_val_dice = [total_per_cls_val_dice[i] / val_steps for i in range(num_classes)]
+            # avg_train_loss = train_loss_sum / args.eval_iters
+            # train_loss_list.append(avg_train_loss)
+            # val_dice_list.append(avg_val_dice)
+            # val_per_cls_dice_list.append(avg_per_cls_val_dice)
+            # iters_list.append(it)
+            # train_loss_sum = 0
+            # print(f"[Iter {it}], Train loss: {avg_train_loss}, Val dice: {avg_val_dice}")
+            # print(f"Val per class dice: {avg_per_cls_val_dice}")
+            # if avg_val_dice > best_val_dice:
+            #     best_val_dice = avg_val_dice
+            #     print(f"Saving best model with val dice: {best_val_dice} on iter: {it}")
+            #     torch.save(seg_model.state_dict(), args.output_dir + "/best_model.pth")
+
+            seg_model.eval()
+            with torch.no_grad():
+                for val_data in val_loader:
+                    detection_val_iter(
+                        model=seg_model,
+                        batch=val_data,
+                        detection_metric=detection_metric,
+                        patch_size=args.image_size,
+                        stride=detection_strides,
+                        overlap=0.5,
+                        dataset_name=args.dataset_name,
+                    )
+                    clear_cuda_memory()
+
+            best_f4, best_thr, best_per_cls = detection_metric.threshold_sweep()
+            detection_metric.reset()
+
+            # AA: divide by the iterations actually accumulated, not args.eval_iters
+            avg_train_loss = train_loss_sum / max(train_loss_count, 1)
+            train_loss_list.append(avg_train_loss)
+            val_f4_list.append(best_f4)
+            val_per_cls_f4_list.append({k: float(v) for k, v in best_per_cls.items()})
+            iters_list.append(it)
+            train_loss_sum = 0
+            train_loss_count = 0
+
+            print(f"[Iter {it}] Train loss: {avg_train_loss:.4f}, Val F4: {best_f4:.4f}", flush=True)
+            print(f"Val per-class F4: {best_per_cls}", flush=True)
+            print(f"Val per-class thresholds: {best_thr}", flush=True)
+
+            # top-5 checkpoint saving (min-heap keeps 5 highest F4 checkpoints)
+            ckpt_path = os.path.join(args.output_dir, f"model_iter{it:07d}_f4{best_f4:.4f}.pth")
+            torch.save(seg_model.state_dict(), ckpt_path)
+            heapq.heappush(top5_heap, (best_f4, it, ckpt_path))
+            if len(top5_heap) > 5:
+                _, _, old_path = heapq.heappop(top5_heap)
+                if os.path.isfile(old_path):
+                    os.remove(old_path)
+
+            if best_f4 > best_val_f4:
+                best_val_f4 = best_f4
+                best_val_thr = best_thr
+                print(f"New best Val F4: {best_val_f4:.4f} at iter {it}", flush=True)
+                torch.save(seg_model.state_dict(), os.path.join(args.output_dir, "best_model.pth"))
+
+            # set back to train mode
+            seg_model.train()
+            if not args.train_feature_model and not from_scratch:
+                if args.segmentation_head == 'ViTAdapterUNETR':
+                    seg_model.feature_model.vit_model.eval()
+                else:
+                    seg_model.feature_model.eval()
+
+        if it >= max_iter:
+            break
+
+    # AA: old segmentation test block:
+    # seg_model.load_state_dict(torch.load(args.output_dir + "/best_model.pth"))
+    # seg_model.eval()
+    # total_test_dice = 0
+    # total_per_cls_test_dice = [0 for _ in range(num_classes)]
+    # test_steps = 0
+    # with torch.no_grad():
+    #     for test_data in test_loader:
+    #         test_dice, test_per_cls_dice = val_iter(
+    #             model=seg_model, batch=test_data,
+    #             image_size=(args.image_size,) * 3, batch_size=args.batch_size,
+    #             metric=dice_metric, overlap=0.75
+    #         )
+    #         total_test_dice += test_dice
+    #         for i in range(num_classes):
+    #             total_per_cls_test_dice[i] += test_per_cls_dice[i]
+    #         test_steps += 1
+    #         clear_cuda_memory()
+    # avg_test_dice = total_test_dice / test_steps
+    # avg_per_cls_test_dice = [total_per_cls_test_dice[i] / test_steps for i in range(num_classes)]
+    # print(f"Test dice: {avg_test_dice}")
+    # print(f"Test per class dice: {avg_per_cls_test_dice}")
+
+    seg_model.load_state_dict(torch.load(os.path.join(args.output_dir, "best_model.pth")))
+    seg_model.eval()
+    test_metric = get_metric(args.dataset_name)
+    with torch.no_grad():
+        for test_data in test_loader:
+            detection_val_iter(
+                model=seg_model,
+                batch=test_data,
+                detection_metric=test_metric,
+                patch_size=args.image_size,
+                stride=detection_strides,
+                overlap=0.75,
+                dataset_name=args.dataset_name,
+            )
+            clear_cuda_memory()
+
+    # Test is scored at the thresholds chosen on val for the best checkpoint; no sweep on test,
+    # which would tune thresholds on the test set itself and inflate F4
+    if best_val_thr is None:
+        raise RuntimeError("No validation run before test: best_val_thr is unset (eval_iters > total iters?)")
+    test_f4, test_per_cls = test_metric.f4_at_thresholds(best_val_thr)
+    print(f"Test F4 @ val thresholds: {test_f4:.4f}", flush=True)
+    print(f"Test per-class F4 @ val thresholds: {test_per_cls}", flush=True)
+    print(f"Val-selected thresholds: {best_val_thr}", flush=True)
+
+    # AA: old segmentation results JSON:
+    # with open(f'{args.output_dir}/results.json', 'w') as fp:
+    #     json.dump({
+    #         'iters_list': iters_list,
+    #         'train_loss_list': train_loss_list,
+    #         'val_dice_list': val_dice_list,
+    #         'val_per_cls_dice_list': val_per_cls_dice_list,
+    #         'test_dice': avg_test_dice,
+    #         'test_per_cls_dice': avg_per_cls_test_dice,
+    #     }, fp)
+    with open(os.path.join(args.output_dir, 'results.json'), 'w') as fp:
+        json.dump({
+            'iters_list':          iters_list,
+            'train_loss_list':     train_loss_list,
+            'val_f4_list':         val_f4_list,
+            'val_per_cls_f4_list': val_per_cls_f4_list,
+            'test_f4':             float(test_f4),
+            'test_per_cls_f4':     {k: float(v) for k, v in test_per_cls.items()},   # at val thresholds
+            'best_val_f4':         float(best_val_f4),
+            'best_val_thresholds': best_val_thr,
+        }, fp)
+
+    # opt-in: keep the per-tomogram test detections (all candidates + GT) next to results.json
+    if args.save_test_predictions:
+        try:
+            from dinov2.eval.detection_3d.prediction_io import save_test_predictions
+            paths = save_test_predictions(
+                args.output_dir,
+                images=[d["image"] for d in test_ds.data],
+                voxel_sizes=[d.get("voxel_size", 10.0) for d in test_ds.data],
+                metric=test_metric, val_thresholds=best_val_thr,
+                extra={"test_f4": float(test_f4), "test_per_cls_f4": {k: float(v) for k, v in test_per_cls.items()},
+                       "checkpoint": os.path.join(args.output_dir, "best_model.pth"),
+                       "decode": {"overlap": 0.75, "stride": detection_strides, "patch_size": args.image_size,
+                                  "min_score": 0.05, "nms_iou": 0.8}})
+            print(f"Saved test predictions: {paths[0]}, {paths[1]}", flush=True)
+        except Exception as e:  # never lose results.json over this
+            print(f"WARNING: could not save test predictions: {e!r}", flush=True)
+
+
+def main(args):
+    if args.segmentation_head == 'ResNetFPN':
+        # CNN from scratch: no DINO backbone to build or load (--pretrained-weights unused);
+        # the config is still read for output dir / logging and the autocast dtype.
+        torch.backends.cudnn.benchmark = True
+        config = setup_3d(args)
+        do_finetune(None, get_autocast_dtype(config), args)
+        return
+    feature_model, autocast_dtype = setup_and_build_model_3d(args)
+    do_finetune(feature_model, autocast_dtype, args)
+
+
+if __name__ == "__main__":
+    args = add_seg_args(get_args_parser(add_help=True)).parse_args()
+    main(args)

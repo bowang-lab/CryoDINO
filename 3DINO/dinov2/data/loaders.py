@@ -22,6 +22,40 @@ from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
 logger = logging.getLogger("dinov2")
 
 
+def _allow_monai_cache_unpickling():
+    """Let torch>=2.6 read MONAI's PersistentDataset cache files.
+
+    PersistentDataset writes each transformed item with torch.save and reads it back with a
+    bare ``torch.load(hashfile)`` (monai/data/dataset.py, no kwargs to override). Since torch
+    2.6 that defaults to ``weights_only=True``, which refuses the MONAI types in the cached
+    dict — so every cache *hit* raises UnpicklingError. Training therefore dies partway
+    through the first pass, once items start coming back from disk rather than being computed.
+
+    These four types are what the cached dicts actually contain (verified by loading a cache
+    file), and the files are ones we wrote ourselves, so allowing them is safe.
+    """
+    add_safe_globals = getattr(torch.serialization, "add_safe_globals", None)
+    if add_safe_globals is None:
+        return  # torch < 2.6: weights_only is not the default, nothing to do
+    try:
+        from monai.data.meta_tensor import MetaTensor
+        from monai.utils.enums import MetaKeys, SpaceKeys, TraceKeys
+        allowed = [MetaTensor, MetaKeys, SpaceKeys, TraceKeys]
+    except ImportError:  # pragma: no cover - MONAI layout changed
+        logger.warning("Could not import MONAI cache types; PersistentDataset cache hits may fail.")
+        return
+    # numpy types show up in the meta dict of NIfTI-backed items (affines); harmless if unused.
+    try:
+        import numpy as np
+        allowed += [np.ndarray, np.dtype]
+    except ImportError:
+        pass
+    add_safe_globals(allowed)
+
+
+_allow_monai_cache_unpickling()
+
+
 class SamplerType(Enum):
     DISTRIBUTED = 0
     EPOCH = 1
@@ -131,8 +165,8 @@ def make_segmentation_dataset_3d(
         if "10989" in dataset_name or "10010" in dataset_name:
             class_num = 2
         elif "12049" in dataset_name:
-            # class_num = 4  # classes 1 and 5 merged into bg → effective 4 classes (bg + 2,3,4)
-            class_num = 6  # original 6-class labels (remap disabled)
+            class_num = 4  # classes 1 and 5 merged into bg → effective 4 classes (bg + 2,3,4)
+            # class_num = 6  # original 6-class labels (remap disabled)
         else:
             class_num = 4
     ## AA CHANGES END   
@@ -165,6 +199,66 @@ def make_segmentation_dataset_3d(
 
     return train_dataset, val_dataset, test_dataset, input_channels, class_num
 
+def make_detection_dataset_3d(
+    dataset_name: str,
+    dataset_percent: int,
+    base_directory: str,
+    train_transforms: Callable,
+    val_transforms: Callable,
+    cache_path: str,
+    batch_size: int,
+):
+    """
+    Creates a 3d detection dataset with the specified parameters.
+
+    Args:
+        dataset_name: Name of the detection dataset (byu, czi).
+        dataset_percent: Percentage of the dataset to use for training.
+        base_directory: Base directory where dataset json files are stored.
+        train_transforms: Training transforms to apply to images.
+        val_transforms: Validation transforms to apply to images.
+        cache_path: A path to a directory to cache the dataset, used in PersistentDataset.
+        batch_size: Batch size for the dataset.
+    Returns:
+        Created train, val, and test datasets, number of input channels, and number of classes for the dataset.
+    """
+
+    if dataset_name == 'byu':
+        datalist_path = os.path.join(base_directory, f"{dataset_name}_100_datalist.json")
+        class_num = 1       # AA: 1 class (motor); bg is implicit at bg_index=num_classes; was wrongly 2
+        input_channels = 1
+    elif dataset_name == 'czi':
+        datalist_path = os.path.join(base_directory, f"{dataset_name}_100_datalist.json")
+        input_channels = 1
+        class_num = 6  # 6 particle classes; background is implicit (bg_index = num_classes)
+    else:
+        raise ValueError(f'Unsupported dataset "{dataset_name}"')
+
+    with open(datalist_path, 'r') as json_f:
+        datalist = json.load(json_f)
+
+    train_data_ind = int(round(len(datalist['training']) * (dataset_percent / 100)))
+
+    train_datalist = datalist['training'][:train_data_ind]
+    val_datalist = datalist['validation']
+    test_datalist = datalist['test']
+    logger.info(f"# of train samples: {len(train_datalist):,d}")
+    logger.info(f"# of val samples: {len(val_datalist):,d}")
+    logger.info(f"# of test samples: {len(test_datalist):,d}")
+
+    if len(train_datalist) < batch_size:
+        logger.info(f"copying train samples to match batch size: {batch_size:,d}")
+        copied_datalist = []
+        for i in range(batch_size // len(train_datalist)):
+            copied_datalist.extend(deepcopy(train_datalist))
+        assert len(copied_datalist) == batch_size
+        train_datalist = copied_datalist
+
+    train_dataset = PersistentDataset(train_datalist, transform=train_transforms, cache_dir=cache_path)
+    val_dataset = PersistentDataset(val_datalist, transform=val_transforms, cache_dir=cache_path)
+    test_dataset = PersistentDataset(test_datalist, transform=val_transforms, cache_dir=cache_path)
+
+    return train_dataset, val_dataset, test_dataset, input_channels, class_num
 
 def make_classification_dataset_3d(
     dataset_name: str,

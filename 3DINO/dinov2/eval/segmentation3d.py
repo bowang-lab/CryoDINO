@@ -3,6 +3,18 @@
 # This code is licensed under the CC BY-NC-ND 4.0 license
 # found in the LICENSE file in the root directory of this source tree.
 
+# PyTorch 2.6+ changed torch.load default to weights_only=True, which breaks
+# MONAI's PersistentDataset/CacheNTransDataset since cached files contain
+# MetaTensor/dict pickles (not bare tensors). Patch before MONAI is imported
+# (same fix as train3d.py). setdefault preserves any explicit weights_only=True
+# callers (e.g. the raw-patch Lambdad load in loaders.py).
+import torch as _torch
+_orig_torch_load = _torch.load
+def _patched_torch_load(*args, **kwargs):
+    kwargs.setdefault('weights_only', False)
+    return _orig_torch_load(*args, **kwargs)
+_torch.load = _patched_torch_load
+
 from dinov2.data.loaders import make_segmentation_dataset_3d
 from dinov2.data import SamplerType, make_data_loader
 from dinov2.eval.segmentation_3d.segmentation_heads import UNETRHead, LinearDecoderHead, ViTAdapterUNETRHead
@@ -12,12 +24,31 @@ from dinov2.eval.segmentation_3d.metrics import get_metric
 
 import gc
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
 import json
 from functools import partial
 from monai.losses import DiceCELoss, DiceLoss
 from monai.inferers import sliding_window_inference
 from monai.data.utils import list_data_collate
 from monai.optimizers import WarmupCosineSchedule
+
+
+class DeepSupervisionWrapper(nn.Module):
+    def __init__(self, loss, weight_factors=None):
+        super().__init__()
+        assert weight_factors is None or any(x != 0 for x in weight_factors), \
+            "At least one weight factor should be != 0.0"
+        self.weight_factors = tuple(weight_factors) if weight_factors is not None else None
+        self.loss = loss
+
+    def forward(self, *args):
+        assert all(isinstance(i, (tuple, list)) for i in args), \
+            f"all args must be tuple or list, got {[type(i) for i in args]}"
+        weights = self.weight_factors if self.weight_factors is not None else (1,) * len(args[0])
+        return sum(weights[i] * self.loss(*inputs)
+                   for i, inputs in enumerate(zip(*args)) if weights[i] != 0.0)
 
 
 def clear_cuda_memory():
@@ -107,14 +138,26 @@ def add_seg_args(parser):
         type=str,
         help="path to cache directory for monai persistent dataset"
     )
+    parser.add_argument(
+        "--deep-supervision",
+        action="store_true",
+        help="Enable deep supervision with auxiliary decoder outputs (UNETR and ViTAdapterUNETR only)",
+    )
 
     return parser
 
 
-def train_iter(model, batch, optimizer, scheduler, loss_function, scaler):
+def train_iter(model, batch, optimizer, scheduler, loss_function, scaler, deep_supervision=False):
     x, y = (batch["image"].cuda(), batch["label"].cuda())
-    logits = model(x)
-    loss = loss_function(logits, y)
+    outputs = model(x)
+
+    if deep_supervision and isinstance(outputs, (list, tuple)):
+        # Downsample labels to match each auxiliary output resolution
+        labels = [F.interpolate(y.float(), size=out.shape[2:], mode='nearest') for out in outputs]
+        loss = loss_function(list(outputs), labels)
+    else:
+        loss = loss_function(outputs, y)
+
     optimizer.zero_grad()
     scaler.scale(loss).backward()
     scaler.step(optimizer)
@@ -156,7 +199,8 @@ def do_finetune(feature_model, autocast_dtype, args):
         args.dataset_name,
         args.image_size,
         args.resize_scale,
-        min_int=-1.0
+        min_int=-1.0,
+        train_feature_model=args.train_feature_model,
     )
     train_ds, val_ds, test_ds, input_channels, num_classes = make_segmentation_dataset_3d(
         args.dataset_name,
@@ -205,11 +249,13 @@ def do_finetune(feature_model, autocast_dtype, args):
     autocast_ctx = partial(torch.cuda.amp.autocast, enabled=True, dtype=autocast_dtype)
     scaler = torch.cuda.amp.GradScaler()
     if args.segmentation_head == 'UNETR':
-        seg_model = UNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
+        seg_model = UNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx,
+                              deep_supervision=args.deep_supervision)
     elif args.segmentation_head == 'Linear':
         seg_model = LinearDecoderHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
     elif args.segmentation_head == 'ViTAdapterUNETR':
-        seg_model = ViTAdapterUNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx)
+        seg_model = ViTAdapterUNETRHead(feature_model, input_channels, args.image_size, num_classes, autocast_ctx,
+                                        deep_supervision=args.deep_supervision)
     else:
         raise ValueError(f"Unknown segmentation head: {args.segmentation_head}")
 
@@ -248,6 +294,17 @@ def do_finetune(feature_model, autocast_dtype, args):
     else:
         raise ValueError(f"Unknown dataset name: {args.dataset_name}")
 
+    if args.deep_supervision and args.segmentation_head in ('UNETR', 'ViTAdapterUNETR'):
+        # 4 outputs: full res, 1/2, 1/4, 1/8
+        # Normalize first, then zero the lowest resolution output
+        num_ds_outputs = 4
+        weights = np.array([1 / (2 ** i) for i in range(num_ds_outputs)], dtype=np.float32)
+        weights = weights / weights.sum()
+        weights[-1] = 0.0
+        weights = weights.tolist()
+        print(f"Deep supervision enabled. Weights: {weights}")
+        loss_fn = DeepSupervisionWrapper(loss_fn, weight_factors=weights)
+
     dice_metric = get_metric(args.dataset_name)
 
     seg_model.cuda()
@@ -269,7 +326,8 @@ def do_finetune(feature_model, autocast_dtype, args):
             optimizer=optimizer,
             scheduler=scheduler,
             loss_function=loss_fn,
-            scaler=scaler
+            scaler=scaler,
+            deep_supervision=args.deep_supervision
         )
         train_loss_sum += train_loss
 

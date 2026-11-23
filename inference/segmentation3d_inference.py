@@ -110,6 +110,8 @@ def get_args_parser():
                         help="Sliding window overlap (default: 0.75)")
     parser.add_argument("--dataset-name", type=str, default="dataset",
                         help="Dataset name for metrics (used to determine metric type)" )
+    parser.add_argument("--deep-supervision", action="store_true",
+                        help="Must match training setting — instantiates DS heads so checkpoint loads correctly")
     parser.add_argument("--cpu-metrics", action="store_true",
                         help="Compute Dice/HD95 metrics on CPU (avoids GPU OOM on large volumes)")
     return parser
@@ -177,19 +179,19 @@ def build_transforms(dataset_name):
             EnsureType(),
         ])
     # Dataset049 (12049): merge classes 1,5 into bg; remap 2→1, 3→2, 4→3 → 4 classes
-    # elif "12049" in dataset_name:
-    #     def _remap_12049(x):
-    #         out = torch.zeros_like(x)
-    #         out[x == 2] = 1
-    #         out[x == 3] = 2
-    #         out[x == 4] = 3
-    #         return out.float()
-    #     label_transforms = Compose([
-    #         LoadImage(image_only=True),
-    #         EnsureChannelFirst(),
-    #         Lambda(func=_remap_12049),
-    #         EnsureType(),
-    #     ])
+    elif "12049" in dataset_name:
+        def _remap_12049(x):
+            out = torch.zeros_like(x)
+            out[x == 2] = 1
+            out[x == 3] = 2
+            out[x == 4] = 3
+            return out.float()
+        label_transforms = Compose([
+            LoadImage(image_only=True),
+            EnsureChannelFirst(),
+            Lambda(func=_remap_12049),
+            EnsureType(),
+        ])
     else:
         label_transforms = Compose([
             LoadImage(image_only=True),
@@ -227,11 +229,13 @@ def main():
 
     # Build segmentation head
     if args.segmentation_head == 'UNETR':
-        seg_model = UNETRHead(feature_model, args.input_channels, args.image_size, args.num_classes, autocast_ctx)
+        seg_model = UNETRHead(feature_model, args.input_channels, args.image_size, args.num_classes, autocast_ctx,
+                              deep_supervision=args.deep_supervision)
     elif args.segmentation_head == 'Linear':
         seg_model = LinearDecoderHead(feature_model, args.input_channels, args.image_size, args.num_classes, autocast_ctx)
     elif args.segmentation_head == 'ViTAdapterUNETR':
-        seg_model = ViTAdapterUNETRHead(feature_model, args.input_channels, args.image_size, args.num_classes, autocast_ctx)
+        seg_model = ViTAdapterUNETRHead(feature_model, args.input_channels, args.image_size, args.num_classes, autocast_ctx,
+                                        deep_supervision=args.deep_supervision)
 
     # Load checkpoint
     print(f"Loading checkpoint: {args.checkpoint}")

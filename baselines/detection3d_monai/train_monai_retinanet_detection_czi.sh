@@ -1,0 +1,99 @@
+#!/bin/bash
+#SBATCH -J monai-retinanet-detection-czi
+#SBATCH -p gpu_pmccaiteam
+#SBATCH -t 3-00:00:00
+#SBATCH --account=pmccaiteam_gpu
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=24
+#SBATCH --mem=220G
+#SBATCH --output=/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/slurm_logs/%x_%j.log
+
+# =========================
+# Baseline: MONAI RetinaNet 3D (ResNet-FPN, from scratch) — DETECTION (CZI)
+# Validated/tested with the CryoDINO metric (CZIDetectionMetrics, Kaggle CZII F4) so it is
+# directly comparable to slurm_scripts/train_detection.sh.
+#
+# Key differences vs detection3d.py:
+#   * No DINO backbone / config / pretrained weights.
+#   * Train on the honest-split 128^3 .pt patches (5 tomograms, split by tomogram).
+#   * Val (TS_69_2) and test (TS_73_6) run sliding-window over the FULL tomogram NIfTI with
+#     global GT points from point_annotations.csv (each particle counted once).
+#   * The honest-split datalist stores absolute patch paths — regenerate it for this cluster
+#     with preprocessing/make_detection_split.py if the paths differ.
+# =========================
+
+date
+hostname
+pwd
+nvidia-smi
+
+source ~/.bashrc
+conda activate cryodino
+
+# NOT $0/BASH_SOURCE: sbatch copies this script to a per-job spool dir on the compute node
+# (/localscratch/spool/slurmd/job<ID>/), so deriving the kit path from it finds nothing — same
+# gotcha documented in baselines/deepetpicker_kit/README.md. detection3d_monai.py itself
+# self-locates the repo root (walks up looking for 3DINO/ + preprocessing/), so it no longer
+# needs PYTHONPATH=. or to run from inside 3DINO/ — we only need its own absolute path here.
+BASELINES_DIR="${BASELINES_DIR:-/cluster/home/$USER/scripts/cryoet/CryoDINO/baselines}"
+SCRIPT_DIR="$BASELINES_DIR/detection3d_monai"
+
+# =========================
+# Paths
+# =========================
+DATA_ROOT="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream_detection"
+DATALIST="${DATA_ROOT}/Dataset440_CZII_10440_detection_patches_128/honest-split_datalist.json"
+IMAGES_DIR="${DATA_ROOT}/Dataset440_CZII_10440/imagesTr"
+ANNOTATIONS_CSV="${DATA_ROOT}/Dataset440_CZII_10440/point_annotations.csv"
+BASE_OUTPUT_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/finetuning_detection"
+CACHE_DIR_BASE="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/cache_dir_downstream_detection"
+
+# =========================
+# Fixed Parameters
+# =========================
+RESNET_DEPTH=34
+EPOCHS=100
+EPOCH_LENGTH=300
+EVAL_ITERS=1500
+WARMUP_ITERS=3000
+IMAGE_SIZE=128                # = patch size = sliding-window roi
+BATCH_SIZE=4
+NUM_WORKERS=10
+LEARNING_RATE=1e-4
+
+OUTPUT_DIR="${BASE_OUTPUT_DIR}/monai_retinanet_resnet${RESNET_DEPTH}_czi_detection"
+CACHE_DIR="${CACHE_DIR_BASE}/monai_retinanet_czi_detection"
+
+rm -rf "$CACHE_DIR"
+mkdir -p "$CACHE_DIR"
+mkdir -p "$OUTPUT_DIR"
+
+echo "=============================================="
+echo "Starting MONAI RetinaNet detection training..."
+echo "Datalist: $DATALIST"
+echo "Output directory: $OUTPUT_DIR"
+echo "=============================================="
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 python "$SCRIPT_DIR/detection3d_monai.py" \
+  --datalist "$DATALIST" \
+  --images-dir "$IMAGES_DIR" \
+  --annotations-csv "$ANNOTATIONS_CSV" \
+  --val-runs TS_69_2 \
+  --test-runs TS_73_6 \
+  --output-dir "$OUTPUT_DIR" \
+  --cache-dir "$CACHE_DIR" \
+  --resnet-depth "$RESNET_DEPTH" \
+  --epochs "$EPOCHS" \
+  --epoch-length "$EPOCH_LENGTH" \
+  --eval-iters "$EVAL_ITERS" \
+  --warmup-iters "$WARMUP_ITERS" \
+  --image-size "$IMAGE_SIZE" \
+  --batch-size "$BATCH_SIZE" \
+  --num-workers "$NUM_WORKERS" \
+  --learning-rate "$LEARNING_RATE"
+
+echo "Finished detection training: $OUTPUT_DIR"
+echo "  (test F4 threshold-sweep + results.json written by detection3d_monai.py)"
+date
