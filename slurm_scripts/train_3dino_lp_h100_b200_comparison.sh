@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=220G
-#SBATCH --mail-user=attarpour1993@gmail.com
+#SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
@@ -39,7 +39,7 @@ cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 CONFIG_DEFAULT="dinov2/configs/ssl3d_default_config.yaml"       # global_crops_size 96
 CONFIG_HIGHRES_112="dinov2/configs/train/vit3d_highres_112.yaml" # global_crops_size 112
 CONFIG_HIGHRES="dinov2/configs/train/vit3d_highres.yaml"        # global_crops_size 128
-EXP="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+EXP="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments"
 
 # Runs:  label | run_dir | config | image_size | ckpt_iter (optional)
 # ckpt_iter: if set, use ONLY eval/training_<iter>/teacher_checkpoint.pth; if empty,

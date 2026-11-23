@@ -24,8 +24,8 @@ set -euo pipefail
 
 REPO="${REPO:-/cluster/home/$USER/projects/CryoDINO}"
 export KIT="$REPO/baselines/deepetpicker_kit"
-export VENV="${VENV:-/cluster/projects/pmccaiteam/reza/projects/cryoet/envs/deepetpicker}"
-export DEP="${DEP:-/cluster/projects/pmccaiteam/reza/projects/cryoet/envs/DeepETPicker}"
+export VENV="${VENV:-/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/envs/deepetpicker}"
+export DEP="${DEP:-/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/envs/DeepETPicker}"
 LOGS="${LOGS:-/cluster/home/$USER/projects/logs}"
 
 [ -f "$KIT/run_benchmark.sh" ] || { echo "ERROR: no run_benchmark.sh under $KIT"; exit 1; }
@@ -33,13 +33,13 @@ LOGS="${LOGS:-/cluster/home/$USER/projects/logs}"
 [ -d "$DEP" ] || { echo "ERROR: DeepETPicker checkout missing at $DEP"; exit 1; }
 mkdir -p "$LOGS"
 
-PATCH_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection/byu_detection_patches_128_motoronly"
+PATCH_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream_detection/byu_detection_patches_128_motoronly"
 case "$PERCENT" in
   100)   DATALIST="${PATCH_DIR}/byu_100_datalist.json" ;;
   50|10) DATALIST="${PATCH_DIR}/byu_${PERCENT}percent/byu_100_datalist.json" ;;
   *) echo "Unknown PERCENT: $PERCENT"; exit 1 ;;
 esac
-OUT="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines_out/deepetpicker_byu_${PERCENT}pct"
+OUT="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/baselines_out/deepetpicker_byu_${PERCENT}pct"
 export DATASET=byu DATALIST OUT
 
 echo "Datalist: $DATALIST"

@@ -59,8 +59,8 @@ cd /cluster/home/$USER/projects/CryoDINO/3DINO || exit 1
 # =========================
 # Paths
 # =========================
-DETECTION_ROOT="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
-EXPERIMENTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+DETECTION_ROOT="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream_detection"
+EXPERIMENTS="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments"
 BASE_OUTPUT_DIR="${EXPERIMENTS}/finetuning_detection"
 CACHE_DIR_BASE="${EXPERIMENTS}/cache_dir_downstream_detection"
 B200_WEIGHTS="${EXPERIMENTS}/ssl3d_run_b200_high_res_128/eval/training_6249/teacher_checkpoint.pth"

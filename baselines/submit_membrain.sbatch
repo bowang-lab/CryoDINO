@@ -22,7 +22,7 @@
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=220G
 #SBATCH --time=30:00:00
-#SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/slurm_logs/%x_%j.log
 set -euo pipefail
 : "${DATASET:?set DATASET (001 | 010 | 049)}"
 : "${PERCENT:=100}"
@@ -30,7 +30,7 @@ set -euo pipefail
 BASELINES_DIR="${BASELINES_DIR:-/cluster/home/$USER/scripts/cryoet/CryoDINO/baselines}"
 KIT_DIR="$BASELINES_DIR/membrain_kit"
 VENV="$KIT_DIR/venv"
-EXP="${EXP:-/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments}"
+EXP="${EXP:-/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments}"
 
 case "$DATASET" in
   001) BASE="Dataset001_CZII_10001_patches512";              TARGET_CLASS=3 ;;

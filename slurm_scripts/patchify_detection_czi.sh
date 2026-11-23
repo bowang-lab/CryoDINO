@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=220G
-#SBATCH --mail-user=attarpour1993@gmail.com
+#SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
@@ -31,8 +31,8 @@ cd /cluster/home/$USER/scripts/cryoet/CryoDINO || exit 1
 # =========================
 # Paths
 # =========================
-DETECTION_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
-BASE_DATA_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+DETECTION_BASE="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream_detection"
+BASE_DATA_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments"
 
 # Raw CZI detection dataset (image NIfTIs + CSV point annotations + split datalist)
 CZI_SPLIT_DATALIST="${DETECTION_BASE}/czi_dataset/Dataset440_CZII_10440/czi_split_datalist.json"

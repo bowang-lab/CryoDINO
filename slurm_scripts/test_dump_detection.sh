@@ -28,8 +28,8 @@ set -u
 echo "Python env: $(python -c 'import sys, torch; print(sys.prefix, "torch", torch.__version__)')"
 cd /cluster/home/$USER/projects/CryoDINO/3DINO || exit 1
 
-DETECTION_ROOT="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection"
-EXPERIMENTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+DETECTION_ROOT="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream_detection"
+EXPERIMENTS="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments"
 RUN_DIR="${EXPERIMENTS}/finetuning_detection/${RUN_NAME}"
 PATCH_DIR="${DETECTION_ROOT}/Dataset440_CZII_10440_detection_patches_128"
 case "$PERCENT" in 100) BASE_DATA_DIR="$PATCH_DIR" ;; 50|10) BASE_DATA_DIR="${PATCH_DIR}/czi_${PERCENT}percent" ;; *) exit 1 ;; esac

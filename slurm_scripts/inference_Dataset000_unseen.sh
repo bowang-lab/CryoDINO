@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=20
 #SBATCH --mem=220G
-#SBATCH --mail-user=attarpour1993@gmail.com
+#SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
@@ -26,10 +26,10 @@ conda activate cryoet
 cd /cluster/home/$USER/scripts/cryoet/CryoET || exit 1
 
 CONFIG_FILE="3DINO/dinov2/configs/train/vit3d_highres.yaml"
-PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
-FINETUNING_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/finetuning"
-INPUT_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream/Dataset000_CZII_10000/imagesTr"
-LABEL_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream/Dataset000_CZII_10000/labelsTr"
+PRETRAINED_WEIGHTS="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
+FINETUNING_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/finetuning"
+INPUT_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream/Dataset000_CZII_10000/imagesTr"
+LABEL_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream/Dataset000_CZII_10000/labelsTr"
 DATASET_NAME="Dataset001_CZII_10001"   # same class scheme as Dataset001 (4-class)
 NUM_CLASSES=4
 IMAGE_SIZE=112

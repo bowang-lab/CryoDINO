@@ -14,8 +14,8 @@
 # same kit: slurm_scripts/deepetpicker_byu.sh.
 #
 # Env (built on H4H, torch 2.7.1 cu128 so any GPU in the partition works):
-#   $VENV  /cluster/projects/pmccaiteam/reza/projects/cryoet/envs/deepetpicker
-#   $DEP   /cluster/projects/pmccaiteam/reza/projects/cryoet/envs/DeepETPicker
+#   $VENV  /cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/envs/deepetpicker
+#   $DEP   /cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/envs/DeepETPicker
 #          (run_benchmark.sh applies patch_periodic_ckpt.py to it)
 # =========================
 set -euo pipefail
@@ -24,8 +24,8 @@ set -euo pipefail
 
 REPO="${REPO:-/cluster/home/$USER/projects/CryoDINO}"
 export KIT="$REPO/baselines/deepetpicker_kit"
-export VENV="${VENV:-/cluster/projects/pmccaiteam/reza/projects/cryoet/envs/deepetpicker}"
-export DEP="${DEP:-/cluster/projects/pmccaiteam/reza/projects/cryoet/envs/DeepETPicker}"
+export VENV="${VENV:-/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/envs/deepetpicker}"
+export DEP="${DEP:-/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/envs/DeepETPicker}"
 LOGS="${LOGS:-/cluster/home/$USER/projects/logs}"
 
 [ -f "$KIT/run_benchmark.sh" ] || { echo "ERROR: no run_benchmark.sh under $KIT"; exit 1; }
@@ -33,7 +33,7 @@ LOGS="${LOGS:-/cluster/home/$USER/projects/logs}"
 [ -d "$DEP" ] || { echo "ERROR: DeepETPicker checkout missing at $DEP"; exit 1; }
 mkdir -p "$LOGS"
 
-PATCH_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/datasets/downstream_detection/Dataset440_CZII_10440_detection_patches_128"
+PATCH_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/datasets/downstream_detection/Dataset440_CZII_10440_detection_patches_128"
 # REPEAT_TRAIN: the subsets have too few training samples for 300 batches of 4 per epoch, so an epoch
 # shuffles over N copies of them (the values used for the reported runs)
 case "$PERCENT" in
@@ -42,7 +42,7 @@ case "$PERCENT" in
   10)  DATALIST="${PATCH_DIR}/czi_10percent/czi_100_datalist.json";  REPEAT_TRAIN=9 ;;
   *) echo "Unknown PERCENT: $PERCENT"; exit 1 ;;
 esac
-OUT="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/baselines_out/deepetpicker_czi_${PERCENT}pct"
+OUT="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/baselines_out/deepetpicker_czi_${PERCENT}pct"
 export DATASET=czi DATALIST OUT REPEAT_TRAIN
 
 echo "Datalist: $DATALIST"

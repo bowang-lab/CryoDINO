@@ -8,9 +8,9 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=100G
-#SBATCH --mail-user=attarpour1993@gmail.com
+#SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/projects/pmccaiteam/reza/projects/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Visualisation: PCA + MHSA for 3 representative tomograms
@@ -36,9 +36,9 @@ cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 # and IMAGE_SIZE to 128)
 # =========================
 CONFIG="dinov2/configs/train/vit3d_highres_112.yaml"
-WEIGHTS="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/ssl3d_run_b200_high_res/eval/training_6249/teacher_checkpoint.pth"
-IMG_DIR="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/imgs"
-OUT_BASE="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments/attention_maps/vis_output"
+WEIGHTS="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/ssl3d_run_b200_high_res/eval/training_6249/teacher_checkpoint.pth"
+IMG_DIR="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/attention_maps/imgs"
+OUT_BASE="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments/attention_maps/vis_output"
 IMAGE_SIZE=112
 
 SAMPLES=("TS_0001_0000" "TS_0009_0000" "TS_027_0000")

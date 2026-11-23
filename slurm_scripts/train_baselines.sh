@@ -26,7 +26,7 @@ set -euo pipefail
 case "$MODEL" in unet|unetr) ;; *) echo "Unknown MODEL: $MODEL"; exit 1 ;; esac
 
 REPO="${REPO:-/cluster/home/$USER/scripts/cryoet/CryoDINO}"
-EXP="${EXP:-/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments}"
+EXP="${EXP:-/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments}"
 BASE_DATA_DIR="$EXP"
 CACHE_DIR_BASE="$EXP/cache_dir_downstream"
 OUTPUT_BASE="$EXP/baselines"

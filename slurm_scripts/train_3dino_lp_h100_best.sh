@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=700G
-#SBATCH --mail-user=attarpour1993@gmail.com
+#SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
 #SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
@@ -32,7 +32,7 @@ conda activate cryodino
 
 cd /cluster/home/$USER/scripts/cryoet/CryoDINO/3DINO || exit 1
 
-EXP="/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments"
+EXP="/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments"
 CONFIG_FILE="dinov2/configs/train/vit3d_highres_112.yaml"
 PRETRAINED_WEIGHTS="${EXP}/ssl3d_run_h100_high_res/eval/training_9374/teacher_checkpoint.pth"
 IMAGE_SIZE=112

@@ -40,7 +40,7 @@ set -euo pipefail
 : "${DEEP_SUPERVISION:=0}"  # 1: add --deep-supervision (the all-dataset b200_112 loop used it; the per-dataset runs did not)
 
 REPO="${REPO:-/cluster/home/$USER/scripts/cryoet/CryoDINO}"
-EXP="${EXP:-/cluster/projects/pmccaiteam/reza/projects/cryoet/experiments}"
+EXP="${EXP:-/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/experiments}"
 BASE_DATA_DIR="$EXP"
 BASE_OUTPUT_DIR="$EXP/finetuning"
 CACHE_DIR_BASE="$EXP/cache_dir_downstream"
