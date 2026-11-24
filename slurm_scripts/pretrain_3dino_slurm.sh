@@ -10,7 +10,7 @@
 #SBATCH --mem=800G
 #SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=slurm_logs/%x_%j.log
 
 # for a100 GPUs: --cpus-per-task=120, --mem=6000G, num_workers=28
 # for b200 GPUs: --cpus-per-task=120, --mem=450G, num_workers=28

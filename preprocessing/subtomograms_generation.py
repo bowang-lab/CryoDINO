@@ -1,5 +1,5 @@
 """
-This code is written by Ahmadreza Attarpour, attarpour1993@gmail.com
+This code is written by Ahmadreza Attarpour
 This code is written for preprocessing training image patches for CryoET foundation model project
 IT loads a 3D nifti image, performs Otsu thresholding and creates patch_size^3 subtomograms and saves them in the output directory
 """

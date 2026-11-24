@@ -1,5 +1,5 @@
 """
-This code is written by Ahmadreza Attarpour, attarpour1993@gmail.com
+This code is written by Ahmadreza Attarpour
 Adapted from subtomograms_generation.py for downstream segmentation datasets.
 
 Loads image+label NIfTI pairs from a JSON datalist, creates 128^3 patches,

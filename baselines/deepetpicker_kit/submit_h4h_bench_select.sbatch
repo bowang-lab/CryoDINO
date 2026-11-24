@@ -10,7 +10,7 @@
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=48G
 #SBATCH --time=4:00:00
-#SBATCH --output=/cluster/home/%u/deepetpicker/logs/%x-%j.out
+#SBATCH --output=slurm_logs/%x-%j.out
 set -euo pipefail
 
 KIT="${KIT:-$HOME/CryoDINO/baselines/deepetpicker_kit}"   # not $0: sbatch runs a spooled copy

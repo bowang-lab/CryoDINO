@@ -10,7 +10,7 @@
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=192G
 #SBATCH --time=24:00:00
-#SBATCH --output=%x-%j.out
+#SBATCH --output=slurm_logs/%x-%j.out
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"

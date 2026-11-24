@@ -10,7 +10,7 @@
 #SBATCH --mem=700G
 #SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
+#SBATCH --output=slurm_logs/%x_%j.log
 
 # =========================
 # H100 linear probing, pinned to its KNOWN BEST checkpoint (training_9374, the

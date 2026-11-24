@@ -227,3 +227,5 @@ dataset/
 manuscript/
 .DS_Store
 !assets/*.png
+slurm_logs/*
+!slurm_logs/.gitkeep
