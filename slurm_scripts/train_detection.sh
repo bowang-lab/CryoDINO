@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=400G
-#SBATCH --output=slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/projects/logs/%x_%j.log
 
 # =========================
 # Detection benchmark: one (method, dataset, percent) run of dinov2/eval/detection3d.py.

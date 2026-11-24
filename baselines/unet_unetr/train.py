@@ -1,4 +1,4 @@
-# Author: Ahmadreza Attarpour
+# Author: Ahmadreza Attarpour (attarpour1993@gmail.com)
 #
 # Baseline segmentation training script for CryoDINO evaluation.
 # Trains MONAI UNet or UNETR from scratch (random initialization) on cryo-ET datasets

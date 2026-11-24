@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=36G
-#SBATCH --output=slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/projects/logs/%x_%j.log
 
 # Re-run the test set of a finished detection run with its best_model.pth and save per-tomogram
 # predictions (<run>/test_eval/test_predictions.pkl) for bootstrap CIs. Training outputs untouched.

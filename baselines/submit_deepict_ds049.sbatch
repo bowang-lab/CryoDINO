@@ -17,7 +17,7 @@
 #SBATCH --time=30:00:00
 #SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/slurm_logs/%x_%j.log
 set -euo pipefail
 
 date

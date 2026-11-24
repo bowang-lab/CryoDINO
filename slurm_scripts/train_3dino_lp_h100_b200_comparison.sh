@@ -10,7 +10,7 @@
 #SBATCH --mem=220G
 #SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/home/%u/scripts/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Linear-probing comparison across ALL eval checkpoints of each run:

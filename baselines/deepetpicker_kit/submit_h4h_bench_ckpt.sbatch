@@ -11,7 +11,7 @@
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=48G
 #SBATCH --time=2:00:00
-#SBATCH --output=slurm_logs/%x-%A_%a.out
+#SBATCH --output=/cluster/home/%u/deepetpicker/logs/%x-%A_%a.out
 #SBATCH --open-mode=append
 #SBATCH --requeue
 set -euo pipefail

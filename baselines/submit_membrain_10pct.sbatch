@@ -21,7 +21,7 @@
 #SBATCH --time=4-00:00:00
 #SBATCH --mail-user=your.email@example.com
 #SBATCH --mail-type=ALL
-#SBATCH --output=slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/slurm_logs/%x_%j.log
 # No `set -e`: a failure in one dataset is reported and the loop moves on to the next one.
 set -uo pipefail
 

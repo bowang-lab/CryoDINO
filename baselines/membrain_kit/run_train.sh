@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=64G
 #SBATCH --time=24:00:00
-#SBATCH --output=slurm_logs/%x-%j.out
+#SBATCH --output=%x-%j.out
 VENV=/path/to/venv
 DATA_DIR=/path/to/Dataset_membrain
 KIT_DIR=/path/to/membrain_kit

@@ -1,5 +1,5 @@
 """
-Author: Ahmadreza Attarpour
+Author: Ahmadreza Attarpour (attarpour1993@gmail.com)
 
 Baseline Segmentation Inference Script
 

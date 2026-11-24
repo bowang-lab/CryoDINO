@@ -26,7 +26,7 @@ REPO="${REPO:-/cluster/home/$USER/projects/CryoDINO}"
 export KIT="$REPO/baselines/deepetpicker_kit"
 export VENV="${VENV:-/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/envs/deepetpicker}"
 export DEP="${DEP:-/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/envs/DeepETPicker}"
-LOGS="${LOGS:-$PWD/slurm_logs}"   # run from the repo root, like the #SBATCH --output=slurm_logs/ lines
+LOGS="${LOGS:-/cluster/home/$USER/projects/logs}"
 
 [ -f "$KIT/run_benchmark.sh" ] || { echo "ERROR: no run_benchmark.sh under $KIT"; exit 1; }
 [ -f "$VENV/bin/activate" ] || { echo "ERROR: DeepETPicker venv not built at $VENV"; exit 1; }

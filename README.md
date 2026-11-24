@@ -55,8 +55,7 @@ This codebase contains the PyTorch code for pretraining CryoDINO, a 3D ViT-Large
    - [Inference-only baselines (MemBrain-seg / DeePiCt)](#inference-only-baselines-membrain-seg--deepict)
 8. [Visualization](#visualization)
 9. [License](#license)
-10. [Contact](#contact)
-11. [Citation](#citation)
+10. [Citation](#citation)
 
 ---
 
@@ -134,8 +133,6 @@ pip install -r requirements_cryodino.txt
 > **Note:** `requirements.txt` and `environment.yml` reflect the environment used for the H100/A100 experiments (`torch==2.1.0+cu121`, `xformers==0.0.22.post4`, `monai==1.3.0`); `environment_cryodino.yml` and `requirements_cryodino.txt` reflect the B200 environment. Using different versions may require adjustments.
 
 > **GPU memory:** Pretraining was run on 4× B200 (183 GB each); the earlier runs used 4× H100-80GB. Fine-tuning and inference run on a single GPU (200 GB RAM recommended).
-
-**Running the SLURM scripts.** The scripts in `slurm_scripts/` and `baselines/` are the jobs we ran on our cluster: they call the Python entry points shown in this README with our settings filled in. Before reusing one, replace `<USERNAME>` in its paths and `your.email@example.com` in its `--mail-user` line, and submit from the repository root so logs land in `slurm_logs/`.
 
 ---
 
@@ -619,12 +616,6 @@ This project is licensed under the **Creative Commons Attribution-NonCommercial-
 - You may **not** distribute modified versions or use it commercially.
 
 See [LICENSE](LICENSE) for the full terms.
-
----
-
-## Contact
-
-For questions about the code, the pretrained weights, or permissions, exceptions and licensing, contact the corresponding authors: Ahmadreza Attarpour (**<EMAIL>**), Sumin Kim (**<EMAIL>**) or Bo Wang (**<EMAIL>**).
 
 ---
 

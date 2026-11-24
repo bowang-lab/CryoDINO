@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=220G
-#SBATCH --output=slurm_logs/%x_%j.log
+#SBATCH --output=/cluster/projects/pmccaiteam/<USERNAME>/projects/cryoet/slurm_logs/%x_%j.log
 
 # =========================
 # Baseline: MONAI RetinaNet 3D (ResNet-FPN, from scratch) — DETECTION (CZI)
