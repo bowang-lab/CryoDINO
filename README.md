@@ -34,8 +34,7 @@ This codebase contains the PyTorch code for pretraining CryoDINO, a 3D ViT-Large
 - ViT-Large backbone with 16³ patch tokenization (1024-dim, 24 blocks)
 - Three SSL objectives: **DINO** (view consistency) + **iBOT** (masked patch prediction) + **KoLeo** (diversity)
 - Two-stage pretraining: standard 96³ crops → high-resolution 128³ adaptation
-- With a **frozen encoder**, CryoDINO reaches segmentation Dice 0.626 (average of three datasets) and CZII detection F4 0.681 with all labels, and already beats the best baseline trained on all labels with only **50% of them** (0.619 vs 0.585 and 0.672 vs 0.663). For detection, CryoDINO is the frozen encoder with the `adapter_fpn` decoder, lr 1e-3 and gradient clipping 3.0
-- On BYU flagellar-motor detection, CryoDINO reaches F2 0.895 with all labels and 0.864 with 50% of them, above the best baseline trained on all labels (ResNet34-FPN, 0.820)
+- With a **frozen encoder**, CryoDINO reaches segmentation Dice 0.626 (average of three datasets), CZII detection F4 0.681 and BYU detection F2 0.895 with all labels, and already beats the best baseline trained on all labels with only **50% of them** (0.619 vs 0.585, 0.672 vs 0.663 and 0.864 vs 0.820). For detection, CryoDINO is the frozen encoder with the `adapter_fpn` decoder, lr 1e-3 and gradient clipping 3.0
 
 ---
 
