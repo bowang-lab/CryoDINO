@@ -2,28 +2,40 @@
 
 <img src="assets/cryodino_logo.png" alt="CryoDINO logo" width="200px"/>
 
-Ahmadreza Attarpour<sup>\*†</sup>,
-Sumin Kim<sup>\*†</sup>,
-Tony Xu,
-Charles Chen,
-Daphne Baron,
-Ching-Yuan Yu,
-Yeonwoo Seo,
-Baidu Li,
-Elnaz Khalili Samani,
-Mohammad T. Mazhab-Jafari,
-Maged Goubran,
-Barry B. Rubin,
-Jun Ma,
-Bo Wang<sup>†</sup>
+Ahmadreza Attarpour<sup>1\*</sup>,
+Sumin Kim<sup>2,3\*</sup>,
+Tony Xu<sup>4,5</sup>,
+Charles Chen<sup>1</sup>,
+Daphne Baron<sup>1</sup>,
+Ching-Yuan Yu<sup>1</sup>,
+Yeonwoo Seo<sup>6</sup>,
+Baidu Li<sup>10</sup>,
+Elnaz Khalili Samani<sup>7</sup>,
+Mohammad T. Mazhab-Jafari<sup>4,7</sup>,
+Maged Goubran<sup>4,5,8,9</sup>,
+Barry Rubin<sup>1</sup>,
+Jun Ma<sup>4,7,10</sup>,
+Bo Wang<sup>2,3,4,11†</sup>
 
-<sup>\*</sup> Equal contribution &nbsp; <sup>†</sup> Corresponding authors
+<sup>1</sup> Peter Munk Cardiac Centre, University Health Network, Toronto, Canada<br>
+<sup>2</sup> Department of Computer Science, University of Toronto, Toronto, Canada<br>
+<sup>3</sup> Vector Institute, Toronto, Canada<br>
+<sup>4</sup> Department of Medical Biophysics, University of Toronto, Toronto, Canada<br>
+<sup>5</sup> Physical Sciences Platform, Sunnybrook Research Institute, Toronto, Canada<br>
+<sup>6</sup> Graduate School of AI, KAIST, Seoul, South Korea<br>
+<sup>7</sup> Princess Margaret Cancer Center, University Health Network, Toronto, Ontario, Canada<br>
+<sup>8</sup> Hurvitz Brain Sciences, Sunnybrook Health Sciences Centre, Toronto, Canada<br>
+<sup>9</sup> Centre for Neuromodulation, Sunnybrook Health Sciences Centre, Toronto, Canada<br>
+<sup>10</sup> AI Hub, University Health Network, Toronto, Ontario, Canada<br>
+<sup>11</sup> Department of Laboratory Medicine and Pathobiology, University of Toronto, Toronto, Ontario, Canada
+
+<sup>\*</sup> Equal contribution &nbsp; <sup>†</sup> Corresponding author
 
 [Project Page](https://cryodino.github.io/) | [Preprint](https://arxiv.org/abs/XXXX.XXXXX) | [HF Weights](https://huggingface.co/XXXX/CryoDINO)
 
 This codebase contains the PyTorch code for pretraining CryoDINO, a 3D ViT-Large trained with the [3DINO](https://github.com/AICONSlab/3DINO) self-supervised framework on cryo-ET tomograms, and for transferring it to 3D segmentation and particle detection.
 
-**Abstract:** Nanometre-resolution images acquired with cryogenic electron tomography (cryo-ET) provide unprecedented insights into sub-cellular architecture and the 3D spatial organization of macromolecules in their native environment. Yet, there remains an unmet need for computational pipelines that generalize across experimental conditions and downstream tasks while remaining robust to extremely low signal-to-noise ratios and reconstruction artifacts. We present CryoDINO, a general-purpose foundation model for cryo-ET, pretrained using teacher-student self-distillation self-supervised learning on an exceptionally large and diverse corpus of 1,658 tomograms and 425,852 3D patches spanning 37 species and experimental conditions. CryoDINO learns transferable 3D representations that encode explicit semantic information about macromolecular identity and spatial organization. A shared pretrained backbone, coupled with task-specific decoders, enables both semantic segmentation and particle detection. Across multiple semantic-segmentation and particle-detection benchmarks, CryoDINO achieved the strongest overall performance while maintaining high accuracy with limited annotations. CryoDINO establishes a scalable and transferable representation backbone for generalizable computational pipelines in structural biology.
+**Abstract:** Nanometre-resolution images acquired with cryogenic electron tomography (cryo-ET) provide unprecedented insights into sub-cellular architecture and the 3D spatial organization of macromolecules in their native environment. Yet, there remains an unmet need for computational pipelines that generalize across experimental conditions and downstream tasks while remaining robust to extremely low signal-to-noise ratios and reconstruction artifacts. We present CryoDINO, a general-purpose foundation model for cryo-ET, pretrained through self-supervised teacher–student distillation on an exceptionally large and diverse corpus of 1,658 tomograms and 425,852 3D patches spanning 37 species and diverse experimental conditions. CryoDINO learns transferable representations that capture biologically meaningful structural information across molecular and cellular scales. Coupling a shared pretrained backbone with task-specific decoders enables both semantic segmentation and particle detection. Across multiple downstream benchmarks, CryoDINO achieved the strongest overall performance among the evaluated methods and demonstrated high label efficiency, outperforming supervised baselines trained with substantially more annotations. CryoDINO establishes a scalable and transferable representation backbone for generalizable computational pipelines in structural biology.
 
 <p align="center">
   <img src="assets/CryoDINO_figures.png" width="100%"/>
