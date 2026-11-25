@@ -35,6 +35,7 @@ This codebase contains the PyTorch code for pretraining CryoDINO, a 3D ViT-Large
 - Three SSL objectives: **DINO** (view consistency) + **iBOT** (masked patch prediction) + **KoLeo** (diversity)
 - Two-stage pretraining: standard 96³ crops → high-resolution 128³ adaptation
 - With a **frozen encoder**, CryoDINO reaches segmentation Dice 0.626 (average of three datasets) and CZII detection F4 0.681 with all labels, and already beats the best baseline trained on all labels with only **50% of them** (0.619 vs 0.585 and 0.672 vs 0.663). For detection, CryoDINO is the frozen encoder with the `adapter_fpn` decoder, lr 1e-3 and gradient clipping 3.0
+- On BYU flagellar-motor detection, CryoDINO reaches F2 0.895 with all labels and 0.864 with 50% of them, above the best baseline trained on all labels (ResNet34-FPN, 0.820)
 
 ---
 
@@ -512,9 +513,7 @@ per_class_hd95}` plus `overall_*`), with a few extra top-level keys recording th
 threshold that produced the numbers. `baselines/baseline_common.py` carries a verbatim copy of
 `CryoMetrics` from `inference/segmentation3d_inference.py` — that module cannot be imported here
 because its `dinov2` imports run at module scope, so the metric is duplicated rather than shared.
-The copy is guarded: `baselines/test_baseline_eval.py` compares the two class bodies as text and
-fails if they diverge, so the three methods cannot silently drift apart. Labels are always
-binarised (`> 0`), since both baselines are binary.
+Labels are always binarised (`> 0`), since both baselines are binary.
 
 
 ---
