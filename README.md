@@ -30,11 +30,14 @@ This codebase contains the PyTorch code for pretraining CryoDINO, a 3D ViT-Large
 </p>
 
 **Key facts:**
-- Pretrained on **425,000+ 3D patches** from **1,658 tomograms**, spanning bacteria, eukaryota, archaea, and viruses
+- Pretrained on **425,852 3D patches** from **1,658 real cryo-ET tomograms**, spanning **37 species**, **48 datasets**, and diverse acquisition conditions
 - ViT-Large backbone with 16³ patch tokenization (1024-dim, 24 blocks)
-- Three SSL objectives: **DINO** (view consistency) + **iBOT** (masked patch prediction) + **KoLeo** (diversity)
-- Two-stage pretraining: standard 96³ crops → high-resolution 128³ adaptation
-- With a **frozen encoder**, CryoDINO reaches segmentation Dice 0.626 (average of three datasets), CZII detection F4 0.681 and BYU detection F2 0.895 with all labels, and already beats the best baseline trained on all labels with only **50% of them** (0.619 vs 0.585, 0.672 vs 0.663 and 0.864 vs 0.820). For detection, CryoDINO is the frozen encoder with the `adapter_fpn` decoder, lr 1e-3 and gradient clipping 3.0
+- Three SSL objectives: **DINO** (view consistency), **iBOT** (masked patch prediction), and **KoLeo** (representation diversity)
+- Two-stage pretraining: standard 96³ crops followed by high-resolution 128³ adaptation
+- A single **frozen encoder** transfers to both semantic segmentation and particle detection through task-specific decoders
+- CryoDINO achieves a mean segmentation Dice of **0.626**, CZII detection F4 of **0.681**, and BYU detection F2 of **0.895** using a frozen encoder
+- With only **50% of the labeled data**, CryoDINO exceeds the strongest baseline trained with 100% of the labels in segmentation (0.619 vs. 0.585), CZII detection (0.672 vs. 0.663), and BYU detection (0.864 vs. 0.820)
+- Pretraining consistently improves performance over architecturally identical models trained from random initialization, with the largest gain observed on BYU at 10% of the training data (**+0.219 F2**)
 
 ---
 
